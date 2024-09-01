@@ -11,7 +11,16 @@ use crate::state::{Listing, Marketplace};
 #[derive(Accounts)]
 pub struct List<'info> {
     #[account(mut)]
-    maker: Signer<'info>,
+    seller: Signer<'info>,
+
+    #[account(
+        init,
+        payer = seller,
+        space = 8 + Listing::INIT_SPACE,
+        seeds = [b"listing", marketplace.key().as_ref(), mint.key().as_ref()],
+        bump
+    )]
+    listing: Account<'info, Listing>,
 
     #[account(
         mut,
@@ -19,35 +28,27 @@ pub struct List<'info> {
         bump = marketplace.bump
     )]
     marketplace: Account<'info, Marketplace>,
-    pub maker_mint: InterfaceAccount<'info, Mint>,
+
+    pub mint: InterfaceAccount<'info, Mint>,
     pub collection: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
-        associated_token::mint = maker_mint,
-        associated_token::authority = maker
+        associated_token::mint = mint,
+        associated_token::authority = seller
     )]
-    maker_ata: InterfaceAccount<'info, TokenAccount>,
+    seller_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         init,
-        payer = maker,
-        space = 8 + Listing::INIT_SPACE,
-        seeds = [b"listing", marketplace.key().as_ref(), maker_mint.key().as_ref()],
-        bump
-    )]
-    listing: Account<'info, Listing>,
-
-    #[account(
-        init,
-        payer = maker,
-        associated_token::mint = maker_mint,
+        payer = seller,
+        associated_token::mint = mint,
         associated_token::authority = listing,
     )]
-    vault: InterfaceAccount<'info, TokenAccount>,
+    escrow: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        seeds = [b"metadata", metadata_program.key().as_ref(), maker_mint.key().as_ref()],
+        seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref()],
         seeds::program = metadata_program.key(),
         bump,
         constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection.key().as_ref(),
@@ -56,7 +57,7 @@ pub struct List<'info> {
     pub metadata: Account<'info, MetadataAccount>,
 
     #[account(
-    seeds = [b"metadata", metadata_program.key().as_ref(), maker_mint.key().as_ref(), b"edition"],
+    seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref(), b"edition"],
         seeds::program = metadata_program.key(),
         bump
     )]
@@ -68,29 +69,43 @@ pub struct List<'info> {
 }
 
 impl<'info> List<'info> {
-    pub fn create_listing(&mut self, price: u64, bumps: &ListBumps) -> Result<()> {
-        msg!("Creating listing");
+    pub fn create_listing(
+        &mut self, 
+        bid_increment: u64, 
+        timer_extension: i64, 
+        start_time: i64, 
+        initial_duration: i64, 
+        buyout_price: u64, 
+        bumps: &ListBumps
+    ) -> Result<()> {
         self.listing.set_inner(Listing {
-            maker: self.maker.key(),
-            mint: self.maker_mint.key(),
-            price,
-            bump: bumps.listing,
+            mint: self.mint.key(),
+            seller: self.seller.key(),
+            bid_cost: 1,
+            bid_increment,
+            current_bid: 0,
+            highest_bidder: Pubkey::default(),
+            timer_extension,
+            start_time,
+            end_time: start_time + initial_duration,
+            is_active: true,
+            buyout_price,
+            bump: bumps.listing
         });
 
         Ok(())
     }
 
-    pub fn transfer_to_vault(&mut self) -> Result<()> {
-        msg!("Transfer to Vault ");
+    pub fn transfer_to_escrow(&mut self) -> Result<()> {
         let accounts = TransferChecked {
-            from: self.maker_ata.to_account_info(),
-            to: self.vault.to_account_info(),
-            mint: self.maker_mint.to_account_info(),
-            authority: self.maker.to_account_info(),
+            from: self.seller_ata.to_account_info(),
+            to: self.escrow.to_account_info(),
+            mint: self.mint.to_account_info(),
+            authority: self.seller.to_account_info(),
         };
 
         let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
 
-        transfer_checked(cpi_context, 1, self.maker_mint.decimals)
+        transfer_checked(cpi_context, 1, self.mint.decimals)
     }
 }

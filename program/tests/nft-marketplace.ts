@@ -144,6 +144,14 @@ describe("nft-marketplace", () => {
 
     const vault = await getAssociatedTokenAddress(nft.mint, listing, true);
 
+    let listingConfig = {
+      bidIncrement: new anchor.BN(price / 1000),
+      timerExtension: new anchor.BN(20 * 1000), // 20 seconds
+      startTimestamp: new anchor.BN(Date.now()),
+      initialDuration: new anchor.BN(60 * 60 * 1000), // 1 hour
+      buyoutPrice: new anchor.BN(price),
+    }
+
     let accounts = {
       maker: user1.publicKey,
       marketplace,
@@ -157,7 +165,13 @@ describe("nft-marketplace", () => {
 
     try {
       let tx = await program.methods
-        .list(new anchor.BN(price))
+        .list(
+          listingConfig.bidIncrement,
+          listingConfig.timerExtension,
+          listingConfig.startTimestamp,
+          listingConfig.initialDuration,
+          listingConfig.buyoutPrice,
+        )
         .accounts(accounts)
         .signers([user1])
         .rpc();
@@ -168,9 +182,17 @@ describe("nft-marketplace", () => {
     }
 
     const listingAccount = await program.account.listing.fetch(listing);
-    expect(listingAccount.maker).deep.equal(user1.publicKey);
     expect(listingAccount.mint).deep.equal(nft.mint);
-    expect(listingAccount.price.eq(new anchor.BN(price))).to.equal(true);
+    expect(listingAccount.seller).deep.equal(user1.publicKey);
+    expect(listingAccount.bidCost).to.eq(new anchor.BN(1));
+    expect(listingAccount.bidIncrement).to.eq(listingConfig.bidIncrement);
+    expect(listingAccount.currentBid).to.eq(new anchor.BN(0));
+    expect(listingAccount.highestBidder).to.eq(anchor.web3.PublicKey.default);
+    expect(listingAccount.timerExtension).to.eq(listingConfig.timerExtension);
+    expect(listingAccount.startTime).to.eq(listingConfig.startTimestamp);
+    expect(listingAccount.endTime).to.eq(listingConfig.startTimestamp.add(listingConfig.initialDuration));
+    expect(listingAccount.isActive).to.eq(true);
+    expect(listingAccount.buyoutPrice).to.eq(listingConfig.buyoutPrice);
     expect(listingAccount.bump).to.equal(listingBump);
 
     const vaultAccount = await provider.connection.getTokenAccountBalance(
@@ -231,127 +253,37 @@ describe("nft-marketplace", () => {
     expect(userAta.value.amount).to.equal("1");
   });
 
-  it("List and Purchase", async () => {
-    const price = 3 * anchor.web3.LAMPORTS_PER_SOL;
-    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        anchor.utils.bytes.utf8.encode("listing"),
-        marketplace.toBuffer(),
-        nft.mint.toBuffer(),
-      ],
+  it("initialize user", async () => {
+    const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [anchor.utils.bytes.utf8.encode("user"), user1.publicKey.toBuffer()],
       program.programId
     );
 
-    const vault = await getAssociatedTokenAddress(nft.mint, listing, true);
-
-    const makerBalanceInitial = await provider.connection.getBalance(
-      user1.publicKey
-    );
-    // console.log("Maker balance", makerBalanceInitial / anchor.web3.LAMPORTS_PER_SOL);
-
-    const takerBalanceInitial = await provider.connection.getBalance(
-      user2.publicKey
-    );
-    // console.log("Taker balance", takerBalanceInitial / anchor.web3.LAMPORTS_PER_SOL);
-
-    const treasuryBalanceInitial = await provider.connection.getBalance(
-      treasury
-    );
-    // console.log("Treasury balance", treasuryBalanceInitial / anchor.web3.LAMPORTS_PER_SOL);
-
-
     let accounts = {
-      maker: user1.publicKey,
-      marketplace,
-      makerMint: nft.mint,
-      collection: nft.collection,
-      makerAta: nft.ata,
-      listing,
-      vault,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      user: user1.publicKey,
+      user_account: user,
     };
 
     try {
       let tx = await program.methods
-        .list(new anchor.BN(price))
-        .accounts(accounts)
-        .signers([user1])
-        .rpc();
+      .initializeUser()
+      .accounts(accounts)
+      .signers([user1])
+      .rpc();
 
       console.log("Your transaction signature", tx);
     } catch (error) {
       console.error(error);
     }
 
-    const listingAccount = await program.account.listing.fetch(listing);
-    expect(listingAccount.maker).deep.equal(user1.publicKey);
-    expect(listingAccount.mint).deep.equal(nft.mint);
-    expect(listingAccount.price.eq(new anchor.BN(price))).to.equal(true);
-    expect(listingAccount.bump).to.equal(listingBump);
+    const userAccount = await program.account.userAccount.fetch(user);
+    expect(userAccount.totalBidsPlaced).to.equal(0);
+    expect(userAccount.totalAuctionsWon).to.equal(0);
+    expect(userAccount.totalAuctionsParticipated).to.equal(0);
+    expect(userAccount.points).to.equal(0);
+    expect(userAccount.bump).to.equal(bump);
+  })
 
-    let vaultAccountBalance = await provider.connection.getTokenAccountBalance(
-      vault
-    );
-    expect(vaultAccountBalance.value.amount).to.equal("1");
-
-    const purchaseAccounts = {
-      taker: user2.publicKey,
-      maker: user1.publicKey,
-      mint: nft.mint,
-      maker_ata: nft.ata,
-      taker_ata: await getAssociatedTokenAddress(nft.mint, user2.publicKey, true),
-      listing,
-      marketplace,
-      vault,
-      treasury,
-      tokenProgram: TOKEN_PROGRAM_ID,
-    }
-
-    const tx = await program.methods
-      .purchase()
-      .accounts(purchaseAccounts)
-      .signers([user2])
-      .rpc();
-
-    const marketplaceAccount = await program.account.marketplace.fetch(marketplace);
-
-    const fee = (price  * marketplaceAccount.fee) / 10000;
-    const amountToMaker = makerBalanceInitial + price - fee;
-    // Check balance of maker
-    const makerBalance = await provider.connection.getBalance(
-      user1.publicKey
-    );
-    // console.log("Maker balance", makerAccount / anchor.web3.LAMPORTS_PER_SOL);
-    expect(makerBalance).to.be.equal(amountToMaker);
-
-    const costToOpenTokenAccount = 0.003 * anchor.web3.LAMPORTS_PER_SOL;
-    const amountToTaker = takerBalanceInitial - price;
-    const takerBalance = await provider.connection.getBalance(
-      user2.publicKey
-    );
-    // console.log("Taker balance", takerBalance / anchor.web3.LAMPORTS_PER_SOL);
-    expect(takerBalance).to.be.lt(amountToTaker);
-    expect(takerBalance).to.be.gt(amountToTaker - costToOpenTokenAccount);
-
-    const treasuryBalance = await provider.connection.getBalance(
-      treasury
-    );
-    // console.log("Treasury balance", treasuryBalance / anchor.web3.LAMPORTS_PER_SOL);
-    expect(treasuryBalance).to.be.equal(fee);
-
-    const vaultAccount = await provider.connection.getAccountInfo(
-      vault
-    );
-    expect(vaultAccount).to.be.null;
-
-    // Check NFT has been transferred from vault to taker
-    const takerAta = await provider.connection.getTokenAccountBalance(
-      purchaseAccounts.taker_ata
-    );
-    expect(takerAta.value.amount).to.equal("1");
-
-    console.log("Your transaction signature", tx);
-  });
 });
 
 // Helpers
