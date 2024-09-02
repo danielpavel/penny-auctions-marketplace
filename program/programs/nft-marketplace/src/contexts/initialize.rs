@@ -1,5 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface::{Mint, TokenInterface};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{Mint, TokenAccount, TokenInterface},
+};
 
 use crate::errors::MarketplaceErrorCode;
 use crate::state::Marketplace;
@@ -30,12 +33,24 @@ pub struct Initialize<'info> {
     )]
     rewards_mint: InterfaceAccount<'info, Mint>,
 
+    /// CHECK: Mint for the bids. Already initialized. Add checks...
+    bids_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        init,
+        payer = admin,
+        associated_token::mint = bids_mint,
+        associated_token::authority = admin,
+    )]
+    bids_vault: InterfaceAccount<'info, TokenAccount>,
+
     #[account(
         seeds = [b"treasury", marketplace.key().as_ref()],
         bump,
     )]
     pub treasury: SystemAccount<'info>,
 
+    pub associated_token_program: Program<'info, AssociatedToken>,
     system_program: Program<'info, System>,
     token_program: Interface<'info, TokenInterface>,
 }
@@ -49,6 +64,8 @@ impl<'info> Initialize<'info> {
 
         self.marketplace.set_inner(Marketplace {
             admin: self.admin.key(),
+            bids_mint: self.bids_mint.key(),
+            bids_vault: self.bids_vault.key(),
             fee,
             name,
             bump: bumps.marketplace,

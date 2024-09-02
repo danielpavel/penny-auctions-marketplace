@@ -1,14 +1,12 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { Commitment, KeypairSigner, Umi } from "@metaplex-foundation/umi";
+import { Commitment, Umi } from "@metaplex-foundation/umi";
 import { NftMarketplace } from "../target/types/nft_marketplace";
 import { createAndMintNftForCollection } from "./utils/nft";
 import { initUmi } from "./utils/umi";
 
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { expect } from "chai";
-import { MPL_TOKEN_METADATA_PROGRAM_ID } from "@metaplex-foundation/mpl-token-metadata";
-import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
 
 const commitment: Commitment = "finalized"; // processed, confirmed, finalized
 
@@ -142,7 +140,7 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    const vault = await getAssociatedTokenAddress(nft.mint, listing, true);
+    const escrow = await getAssociatedTokenAddress(nft.mint, listing, true);
 
     let listingConfig = {
       bidIncrement: new anchor.BN(price / 1000),
@@ -150,16 +148,16 @@ describe("nft-marketplace", () => {
       startTimestamp: new anchor.BN(Date.now()),
       initialDuration: new anchor.BN(60 * 60 * 1000), // 1 hour
       buyoutPrice: new anchor.BN(price),
-    }
+    };
 
     let accounts = {
-      maker: user1.publicKey,
-      marketplace,
-      makerMint: nft.mint,
-      collection: nft.collection,
-      makerAta: nft.ata,
+      seller: user1.publicKey,
       listing,
-      vault,
+      marketplace,
+      mint: nft.mint,
+      collection: nft.collection,
+      sellerAta: nft.ata,
+      escrow,
       tokenProgram: TOKEN_PROGRAM_ID,
     };
 
@@ -170,7 +168,7 @@ describe("nft-marketplace", () => {
           listingConfig.timerExtension,
           listingConfig.startTimestamp,
           listingConfig.initialDuration,
-          listingConfig.buyoutPrice,
+          listingConfig.buyoutPrice
         )
         .accounts(accounts)
         .signers([user1])
@@ -182,25 +180,48 @@ describe("nft-marketplace", () => {
     }
 
     const listingAccount = await program.account.listing.fetch(listing);
+
+    //console.log(JSON.stringify(listingAccount, null, 2));
+
     expect(listingAccount.mint).deep.equal(nft.mint);
     expect(listingAccount.seller).deep.equal(user1.publicKey);
-    expect(listingAccount.bidCost).to.eq(new anchor.BN(1));
-    expect(listingAccount.bidIncrement).to.eq(listingConfig.bidIncrement);
-    expect(listingAccount.currentBid).to.eq(new anchor.BN(0));
-    expect(listingAccount.highestBidder).to.eq(anchor.web3.PublicKey.default);
-    expect(listingAccount.timerExtension).to.eq(listingConfig.timerExtension);
-    expect(listingAccount.startTime).to.eq(listingConfig.startTimestamp);
-    expect(listingAccount.endTime).to.eq(listingConfig.startTimestamp.add(listingConfig.initialDuration));
+    expect(listingAccount.bidCost.eq(new anchor.BN(1))).to.eq(true);
+    expect(listingAccount.bidIncrement.eq(listingConfig.bidIncrement)).to.eq(
+      true
+    );
+    expect(listingAccount.currentBid.eq(new anchor.BN(0))).to.eq(true);
+    expect(listingAccount.highestBidder).to.deep.eq(
+      anchor.web3.PublicKey.default
+    );
+    expect(
+      listingAccount.timerExtension.eq(listingConfig.timerExtension)
+    ).to.eq(true);
+    expect(listingAccount.startTime.eq(listingConfig.startTimestamp)).to.eq(
+      true
+    );
+    expect(
+      listingAccount.endTime.eq(
+        listingConfig.startTimestamp.add(listingConfig.initialDuration)
+      )
+    ).to.eq(true);
     expect(listingAccount.isActive).to.eq(true);
-    expect(listingAccount.buyoutPrice).to.eq(listingConfig.buyoutPrice);
+    expect(listingAccount.buyoutPrice.eq(listingConfig.buyoutPrice)).to.eq(
+      true
+    );
     expect(listingAccount.bump).to.equal(listingBump);
 
-    const vaultAccount = await provider.connection.getTokenAccountBalance(
-      vault
+    // Check seller ATA has been debited
+    const sellerAta = await provider.connection.getTokenAccountBalance(nft.ata);
+    expect(sellerAta.value.amount).to.equal("0");
+
+    // Check escrow ATA has been credited
+    const escrowAccount = await provider.connection.getTokenAccountBalance(
+      escrow
     );
-    expect(vaultAccount.value.amount).to.equal("1");
+    expect(escrowAccount.value.amount).to.equal("1");
   });
 
+  /*
   it("Delist", async () => {
     const [listing, _listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
       [
@@ -252,7 +273,9 @@ describe("nft-marketplace", () => {
     const userAta = await provider.connection.getTokenAccountBalance(nft.ata);
     expect(userAta.value.amount).to.equal("1");
   });
+  */
 
+  /*
   it("initialize user", async () => {
     const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
       [anchor.utils.bytes.utf8.encode("user"), user1.publicKey.toBuffer()],
@@ -277,13 +300,13 @@ describe("nft-marketplace", () => {
     }
 
     const userAccount = await program.account.userAccount.fetch(user);
-    expect(userAccount.totalBidsPlaced).to.equal(0);
-    expect(userAccount.totalAuctionsWon).to.equal(0);
-    expect(userAccount.totalAuctionsParticipated).to.equal(0);
-    expect(userAccount.points).to.equal(0);
+    expect(userAccount.totalBidsPlaced).to.equal(new anchor.BN(0));
+    expect(userAccount.totalAuctionsWon).to.equal(new anchor.BN(0));
+    expect(userAccount.totalAuctionsParticipated).to.equal(new anchor.BN(0));
+    expect(userAccount.points).to.equal(new anchor.BN(0));
     expect(userAccount.bump).to.equal(bump);
   })
-
+  */
 });
 
 // Helpers

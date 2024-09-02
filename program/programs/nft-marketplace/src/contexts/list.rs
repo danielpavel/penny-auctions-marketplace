@@ -20,7 +20,7 @@ pub struct List<'info> {
         seeds = [b"listing", marketplace.key().as_ref(), mint.key().as_ref()],
         bump
     )]
-    listing: Account<'info, Listing>,
+    listing: Box<Account<'info, Listing>>,
 
     #[account(
         mut,
@@ -70,13 +70,13 @@ pub struct List<'info> {
 
 impl<'info> List<'info> {
     pub fn create_listing(
-        &mut self, 
-        bid_increment: u64, 
-        timer_extension: i64, 
-        start_time: i64, 
-        initial_duration: i64, 
-        buyout_price: u64, 
-        bumps: &ListBumps
+        &mut self,
+        bid_increment: u64,
+        timer_extension: u64,
+        start_time: i64,
+        initial_duration: i64,
+        buyout_price: u64,
+        bumps: &ListBumps,
     ) -> Result<()> {
         self.listing.set_inner(Listing {
             mint: self.mint.key(),
@@ -90,7 +90,7 @@ impl<'info> List<'info> {
             end_time: start_time + initial_duration,
             is_active: true,
             buyout_price,
-            bump: bumps.listing
+            bump: bumps.listing,
         });
 
         Ok(())
