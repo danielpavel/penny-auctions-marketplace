@@ -33,14 +33,13 @@ pub struct Initialize<'info> {
     )]
     rewards_mint: InterfaceAccount<'info, Mint>,
 
-    /// CHECK: Mint for the bids. Already initialized. Add checks...
     bids_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init,
         payer = admin,
         associated_token::mint = bids_mint,
-        associated_token::authority = admin,
+        associated_token::authority = marketplace,
     )]
     bids_vault: InterfaceAccount<'info, TokenAccount>,
 

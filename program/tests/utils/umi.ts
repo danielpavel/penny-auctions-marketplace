@@ -1,4 +1,5 @@
-import { Provider, web3 } from "@coral-xyz/anchor";
+import { web3 } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
 import {
   createSignerFromKeypair,
@@ -7,13 +8,12 @@ import {
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
 
-export function initUmi(provider: Provider) {
-  const umi = createUmi(provider.connection.rpcEndpoint);
-  let providerKeypair = provider.wallet.payer as web3.Keypair;
+export function initUmi(connection: web3.Connection, wallet: NodeWallet) {
+  const umi = createUmi(connection.rpcEndpoint, "confirmed");
 
   const myKeypairSigner = createSignerFromKeypair(
     umi,
-    fromWeb3JsKeypair(providerKeypair)
+    fromWeb3JsKeypair(wallet.payer)
   );
 
   umi.use(signerIdentity(myKeypairSigner));

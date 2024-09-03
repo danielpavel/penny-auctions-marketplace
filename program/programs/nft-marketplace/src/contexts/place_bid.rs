@@ -17,7 +17,7 @@ pub struct PlaceBid<'info> {
 
     #[account(
         mut,
-        associated_token::mint = marketplace.bids_mint,
+        associated_token::mint = bids_mint,
         associated_token::authority = bidder,
     )]
     bidder_ata: InterfaceAccount<'info, TokenAccount>,
@@ -72,12 +72,12 @@ impl<'info> PlaceBid<'info> {
         self.transfer_bid_token()?;
 
         let auction = &mut self.listing;
-        auction
+        auction.current_bid = auction
             .current_bid
             .checked_add(auction.bid_increment)
             .ok_or(ProgramError::ArithmeticOverflow)?;
         auction.highest_bidder = self.bidder.key();
-        auction
+        auction.end_time = auction
             .end_time
             .checked_add(auction.timer_extension as i64)
             .ok_or(ProgramError::ArithmeticOverflow)?;
@@ -90,12 +90,23 @@ impl<'info> PlaceBid<'info> {
             from: self.bidder_ata.to_account_info(),
             to: self.bids_vault.to_account_info(),
             mint: self.bids_mint.to_account_info(),
-            authority: self.marketplace.to_account_info(),
+            authority: self.bidder.to_account_info(),
         };
 
         let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
 
-        transfer_checked(cpi_context, 1, self.bids_mint.decimals)?;
+        let decimals = self.bids_mint.decimals;
+        let amount = self
+            .listing
+            .bid_cost
+            .checked_mul(
+                10u64
+                    .checked_pow(decimals as u32)
+                    .ok_or(ProgramError::ArithmeticOverflow)?,
+            )
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        transfer_checked(cpi_context, amount, decimals)?;
 
         Ok(())
     }

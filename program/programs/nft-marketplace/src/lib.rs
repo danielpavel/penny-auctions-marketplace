@@ -48,4 +48,8 @@ pub mod nft_marketplace {
     pub fn purchase(ctx: Context<Purchase>) -> Result<()> {
         ctx.accounts.purchase()
     }
+
+    pub fn place_bid(ctx: Context<PlaceBid>) -> Result<()> {
+        ctx.accounts.place_bid()
+    }
 }
