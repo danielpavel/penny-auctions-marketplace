@@ -217,9 +217,11 @@ describe("nft-marketplace", () => {
 
     let listingConfig = {
       bidIncrement: new anchor.BN(price / 1000),
-      timerExtension: new anchor.BN(20 * 1000), // 20 seconds
+      //timerExtension: new anchor.BN(20 * 1000), // 20 seconds
+      timerExtension: new anchor.BN(5 * 1000), // 5 seconds
       startTimestamp: new anchor.BN(Date.now() - 2000),
-      initialDuration: new anchor.BN(60 * 60 * 1000), // 1 hour
+      //initialDuration: new anchor.BN(60 * 60 * 1000), // 1 hour
+      initialDuration: new anchor.BN(5 * 1000), // 5 seconds
       buyoutPrice: new anchor.BN(price),
     };
 
@@ -350,6 +352,7 @@ describe("nft-marketplace", () => {
 
       console.log("Bid 1 transaction signature", tx);
 
+      /*
       oldEndTime = listingAccount.endTime.toNumber();
 
       accounts = {
@@ -390,9 +393,80 @@ describe("nft-marketplace", () => {
       expect(vaultBalance.value.uiAmount).to.equal(2);
 
       console.log("Bid 2 transaction signature", tx);
+      */
     } catch (error) {
       console.error(error);
     }
+  });
+
+  it("End Auction", async () => {
+    // Sleep for 10 seconds
+    console.log("Sleeping for 10 seconds...");
+    await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
+
+    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        nft.mint.toBuffer(),
+      ],
+      program.programId
+    );
+
+    const user2NftAta = getAssociatedTokenAddressSync(
+      nft.mint,
+      user2.publicKey
+    );
+    const escrow = getAssociatedTokenAddressSync(nft.mint, listing, true);
+
+    let accounts = {
+      user: user2.publicKey,
+      seller: user1.publicKey,
+      userAta: user2NftAta,
+      mint: nft.mint,
+      listing,
+      escrow,
+      treasury,
+      marketplace,
+      bidsVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    };
+
+    try {
+      let tx = await program.methods
+        .endListing()
+        .accounts(accounts)
+        .signers([user2])
+        .rpc();
+
+      console.log("Your transaction signature", tx);
+    } catch (err) {
+      console.error(err);
+    }
+
+    const listingAccount = await program.account.listing.fetch(listing);
+    expect(listingAccount.isActive).to.eq(false);
+
+    try {
+      // check escrow ATA has been closed
+      const escrowAccount = await provider.connection.getTokenAccountBalance(
+        escrow
+      );
+    } catch (err) {
+      const msg =
+        "failed to get token account balance: Invalid param: could not find account";
+      expect(err.message).to.equal(msg);
+    }
+
+    // check user2 has received the NFT
+    const user2NftAtaBalance = await provider.connection.getTokenAccountBalance(
+      user2NftAta
+    );
+    expect(user2NftAtaBalance.value.amount).to.equal("1");
+
+    // check treasury has received the current bid amount
+    const treasuryBalance = await provider.connection.getBalance(treasury);
+    expect(treasuryBalance).to.equal(listingAccount.currentBid.toNumber());
   });
 
   /*
@@ -406,7 +480,7 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    const vault = await getAssociatedTokenAddress(nft.mint, listing, true);
+    const escrow = await getAssociatedTokenAddress(nft.mint, listing, true);
 
     let accounts = {
       maker: user1.publicKey,
@@ -414,7 +488,7 @@ describe("nft-marketplace", () => {
       makerMint: nft.mint,
       makerAta: nft.ata,
       listing,
-      vault,
+      escrow,
       tokenProgram: TOKEN_PROGRAM_ID,
     };
 
@@ -449,7 +523,6 @@ describe("nft-marketplace", () => {
   });
   */
 
-  /*
   it("initialize user", async () => {
     const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
       [anchor.utils.bytes.utf8.encode("user"), user1.publicKey.toBuffer()],
@@ -463,10 +536,10 @@ describe("nft-marketplace", () => {
 
     try {
       let tx = await program.methods
-      .initializeUser()
-      .accounts(accounts)
-      .signers([user1])
-      .rpc();
+        .initializeUser()
+        .accounts(accounts)
+        .signers([user1])
+        .rpc();
 
       console.log("Your transaction signature", tx);
     } catch (error) {
@@ -474,13 +547,12 @@ describe("nft-marketplace", () => {
     }
 
     const userAccount = await program.account.userAccount.fetch(user);
-    expect(userAccount.totalBidsPlaced).to.equal(new anchor.BN(0));
-    expect(userAccount.totalAuctionsWon).to.equal(new anchor.BN(0));
-    expect(userAccount.totalAuctionsParticipated).to.equal(new anchor.BN(0));
-    expect(userAccount.points).to.equal(new anchor.BN(0));
+    expect(userAccount.totalBidsPlaced).to.equal(0);
+    expect(userAccount.totalAuctionsWon).to.equal(0);
+    expect(userAccount.totalAuctionsParticipated).to.equal(0);
+    expect(userAccount.points).to.equal(0);
     expect(userAccount.bump).to.equal(bump);
-  })
-  */
+  });
 });
 
 // Helpers

@@ -8,7 +8,10 @@ use anchor_spl::{
     },
 };
 
-use crate::state::{Listing, Marketplace};
+use crate::{
+    state::{Listing, Marketplace},
+    utils::{assert_auction_delist_eligible, assert_auction_ended},
+};
 
 #[derive(Accounts)]
 pub struct Delist<'info> {
@@ -54,12 +57,15 @@ pub struct Delist<'info> {
 
 impl<'info> Delist<'info> {
     pub fn withdraw_nft_and_close(&mut self) -> Result<()> {
+        assert_auction_ended(&self.listing)?;
+        assert_auction_delist_eligible(&self.listing)?;
+
         let bump = [self.listing.bump];
         let signer_seeds = [&[
             b"listing",
             self.marketplace.to_account_info().key.as_ref(),
             self.maker_mint.to_account_info().key.as_ref(),
-            &bump
+            &bump,
         ][..]];
 
         let accounts = TransferChecked {

@@ -52,4 +52,8 @@ pub mod nft_marketplace {
     pub fn place_bid(ctx: Context<PlaceBid>) -> Result<()> {
         ctx.accounts.place_bid()
     }
+
+    pub fn end_listing(ctx: Context<EndListing>) -> Result<()> {
+        ctx.accounts.end_listing()
+    }
 }
