@@ -96,28 +96,6 @@ impl<'info> EndListing<'info> {
         Ok(())
     }
 
-    fn _transfer_sol(
-        &self,
-        from: &AccountInfo<'info>,
-        to: &AccountInfo<'info>,
-        amount: u64,
-    ) -> Result<()> {
-        // Create the transfer instruction
-        let transfer_instruction = system_instruction::transfer(from.key, to.key, amount);
-
-        // Invoke the transfer instruction
-        anchor_lang::solana_program::program::invoke(
-            &transfer_instruction,
-            &[
-                from.to_account_info(),
-                to.to_account_info(),
-                self.system_program.to_account_info(),
-            ],
-        )?;
-
-        Ok(())
-    }
-
     pub fn withdraw_nft_and_close(&mut self) -> Result<()> {
         let bump = [self.listing.bump];
         let signer_seeds = [&[

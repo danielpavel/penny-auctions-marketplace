@@ -3,20 +3,16 @@ use anchor_lang::prelude::*;
 use solana_program::{program::invoke, system_instruction};
 
 pub use crate::errors::MarketplaceErrorCode;
-use crate::{constants::MS_IN_SEC, state::Listing};
+use crate::state::Listing;
 
 pub fn assert_auction_active(listing: &Account<Listing>) -> Result<()> {
-    let clock = Clock::get()?;
-    let current_timestamp = clock
-        .unix_timestamp
-        .checked_mul(MS_IN_SEC)
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let current_slot = Clock::get()?.slot;
 
     if !listing.is_active {
         return err!(MarketplaceErrorCode::AuctionNotActive);
-    } else if current_timestamp < listing.start_time {
+    } else if current_slot < listing.start_time_in_slots {
         return err!(MarketplaceErrorCode::AuctionNotStarted);
-    } else if current_timestamp > listing.end_time {
+    } else if current_slot > listing.end_time_in_slots {
         return err!(MarketplaceErrorCode::AuctionEnded);
     }
 
@@ -24,13 +20,9 @@ pub fn assert_auction_active(listing: &Account<Listing>) -> Result<()> {
 }
 
 pub fn assert_auction_ended(listing: &Account<Listing>) -> Result<()> {
-    let clock = Clock::get()?;
-    let current_timestamp = clock
-        .unix_timestamp
-        .checked_mul(MS_IN_SEC)
-        .ok_or(ProgramError::ArithmeticOverflow)?;
+    let current_slot = Clock::get()?.slot;
 
-    if current_timestamp < listing.end_time {
+    if current_slot < listing.end_time_in_slots {
         return err!(MarketplaceErrorCode::AuctionNotEnded);
     }
 

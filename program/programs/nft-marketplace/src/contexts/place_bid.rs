@@ -77,9 +77,9 @@ impl<'info> PlaceBid<'info> {
             .checked_add(auction.bid_increment)
             .ok_or(ProgramError::ArithmeticOverflow)?;
         auction.highest_bidder = self.bidder.key();
-        auction.end_time = auction
-            .end_time
-            .checked_add(auction.timer_extension as i64)
+        auction.end_time_in_slots = auction
+            .end_time_in_slots
+            .checked_add(auction.timer_extension_in_slots)
             .ok_or(ProgramError::ArithmeticOverflow)?;
 
         Ok(())

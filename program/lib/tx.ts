@@ -106,9 +106,9 @@ export const createListTx = async (
     await program.methods
       .list(
         listingConfig.bidIncrement,
-        listingConfig.timerExtension,
-        listingConfig.startTimestamp,
-        listingConfig.initialDuration,
+        listingConfig.timerExtensionInSlots,
+        listingConfig.startTimeInSlots,
+        listingConfig.initialDurationInSlots,
         listingConfig.buyoutPrice
       )
       .accounts(accounts)

@@ -214,14 +214,20 @@ describe("nft-marketplace", () => {
     );
 
     const escrow = getAssociatedTokenAddressSync(nft.mint, listing, true);
+    const currentSlot = await provider.connection.getSlot();
+
+    const timerExtensionInSlots = 12;
+    const initialDurationInSlots = 24;
+
+    console.log("Current slot", currentSlot);
 
     let listingConfig = {
       bidIncrement: new anchor.BN(price / 1000),
       //timerExtension: new anchor.BN(20 * 1000), // 20 seconds
-      timerExtension: new anchor.BN(5 * 1000), // 5 seconds
-      startTimestamp: new anchor.BN(Date.now() - 2000),
+      timerExtension: new anchor.BN(timerExtensionInSlots), // 12 slots ~ 5 seconds
+      startTimestamp: new anchor.BN(currentSlot),
       //initialDuration: new anchor.BN(60 * 60 * 1000), // 1 hour
-      initialDuration: new anchor.BN(5 * 1000), // 5 seconds
+      initialDuration: new anchor.BN(initialDurationInSlots), // 24 slots ~ 10 seconds
       buyoutPrice: new anchor.BN(price),
     };
 
@@ -256,7 +262,21 @@ describe("nft-marketplace", () => {
 
     const listingAccount = await program.account.listing.fetch(listing);
 
-    //console.log(JSON.stringify(listingAccount, null, 2));
+    const listingData = {
+      mint: listingAccount.mint.toBase58(),
+      seller: listingAccount.seller.toBase58(),
+      bidCost: listingAccount.bidCost.toNumber(),
+      currentBid: listingAccount.currentBid.toNumber(),
+      highestBidder: listingAccount.highestBidder.toBase58(),
+      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+      isActive: listingAccount.isActive,
+      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+      bump: listingAccount.bump,
+    };
+
+    console.log("Listing Data:", listingData);
 
     expect(listingAccount.mint).deep.equal(nft.mint);
     expect(listingAccount.seller).deep.equal(user1.publicKey);
@@ -268,17 +288,13 @@ describe("nft-marketplace", () => {
     expect(listingAccount.highestBidder).to.deep.eq(
       anchor.web3.PublicKey.default
     );
-    expect(
-      listingAccount.timerExtension.eq(listingConfig.timerExtension)
-    ).to.eq(true);
-    expect(listingAccount.startTime.eq(listingConfig.startTimestamp)).to.eq(
-      true
+    expect(listingAccount.timerExtensionInSlots.toNumber()).to.eq(
+      timerExtensionInSlots
     );
-    expect(
-      listingAccount.endTime.eq(
-        listingConfig.startTimestamp.add(listingConfig.initialDuration)
-      )
-    ).to.eq(true);
+    expect(listingAccount.startTimeInSlots.toNumber()).to.eq(currentSlot);
+    expect(listingAccount.endTimeInSlots.toNumber()).to.eq(
+      currentSlot + initialDurationInSlots
+    );
     expect(listingAccount.isActive).to.eq(true);
     expect(listingAccount.buyoutPrice.eq(listingConfig.buyoutPrice)).to.eq(
       true
@@ -297,20 +313,21 @@ describe("nft-marketplace", () => {
   });
 
   it("Bid", async () => {
-    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        anchor.utils.bytes.utf8.encode("listing"),
-        marketplace.toBuffer(),
-        nft.mint.toBuffer(),
-      ],
-      program.programId
-    );
+    const [listing, _listingBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [
+          anchor.utils.bytes.utf8.encode("listing"),
+          marketplace.toBuffer(),
+          nft.mint.toBuffer(),
+        ],
+        program.programId
+      );
 
     let listingAccount = await program.account.listing.fetch(listing);
 
-    let oldEndTime = listingAccount.endTime.toNumber();
+    let oldEndTimeInSlots = listingAccount.endTimeInSlots.toNumber();
     let bidIncrement = listingAccount.bidIncrement.toNumber();
-    let timerExtension = listingAccount.timerExtension.toNumber();
+    let timerExtensionInSlots = listingAccount.timerExtensionInSlots.toNumber();
 
     let accounts = {
       bidder: user2.publicKey,
@@ -334,8 +351,8 @@ describe("nft-marketplace", () => {
 
       expect(listingAccount.currentBid.toNumber()).to.equal(bidIncrement);
       expect(listingAccount.highestBidder).to.deep.equal(user2.publicKey);
-      expect(listingAccount.endTime.toNumber()).to.equal(
-        oldEndTime + timerExtension
+      expect(listingAccount.endTimeInSlots.toNumber()).to.equal(
+        oldEndTimeInSlots + timerExtensionInSlots
       );
 
       // check one bid token was debited from user2

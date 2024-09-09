@@ -51,9 +51,7 @@ commander
       await initBidTokenMint();
       await initTestNftCollection();
 
-      console.log("Initializing project...");
       await initProject();
-      console.log("🟢 Done!");
     } catch (err) {
       console.error("Error initializing project:", err);
     }
@@ -110,10 +108,12 @@ commander
         { skipValidation: true }
       );
 
+      const durationInSlots = Math.floor(Number(duration) * 0.4); // 400ms per slot
+
       try {
         await createAuctionListing(
           Number(price),
-          Number(duration),
+          Number(durationInSlots),
           walletKeypair, // Seller
           new PublicKey(nft),
           new PublicKey(collection)

@@ -21,16 +21,16 @@ pub mod nft_marketplace {
     pub fn list(
         ctx: Context<List>,
         bid_increment: u64,
-        timer_extension: u64,
-        start_time: i64,
-        initial_duration: i64,
+        timer_extension_in_slots: u64,
+        start_time_in_slots: u64,
+        initial_duration_in_slots: u64,
         buyout_price: u64,
     ) -> Result<()> {
         ctx.accounts.create_listing(
             bid_increment,
-            timer_extension,
-            start_time,
-            initial_duration,
+            timer_extension_in_slots,
+            start_time_in_slots,
+            initial_duration_in_slots,
             buyout_price,
             &ctx.bumps,
         )?;

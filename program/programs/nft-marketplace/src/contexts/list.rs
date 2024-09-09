@@ -72,12 +72,16 @@ impl<'info> List<'info> {
     pub fn create_listing(
         &mut self,
         bid_increment: u64,
-        timer_extension: u64,
-        start_time: i64,
-        initial_duration: i64,
+        timer_extension_in_slots: u64,
+        start_time_in_slots: u64,
+        initial_duration_in_slots: u64,
         buyout_price: u64,
         bumps: &ListBumps,
     ) -> Result<()> {
+        let end_time_in_slots = start_time_in_slots
+            .checked_add(initial_duration_in_slots)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
         self.listing.set_inner(Listing {
             mint: self.mint.key(),
             seller: self.seller.key(),
@@ -85,9 +89,9 @@ impl<'info> List<'info> {
             bid_increment,
             current_bid: 0,
             highest_bidder: Pubkey::default(),
-            timer_extension,
-            start_time,
-            end_time: start_time + initial_duration,
+            timer_extension_in_slots,
+            start_time_in_slots,
+            end_time_in_slots,
             is_active: true,
             buyout_price,
             bump: bumps.listing,

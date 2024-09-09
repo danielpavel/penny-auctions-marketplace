@@ -115,7 +115,9 @@ export const initBidTokenMint = async () => {
  * Create Test NFT
  */
 export const initTestNftCollection = async () => {
-  const collection = await createCollectionNft(umi);
+  if (collection.toBase58() == PublicKey.default.toBase58()) {
+    collection = await createCollectionNft(umi);
+  }
 
   console.log("Collection: ", collection.toBase58());
 };
@@ -145,8 +147,12 @@ export const mintTestNft = async (toAccount: PublicKey) => {
  * to initialize marketplace, vault, rewardsMint and treasury accounts
  */
 export const initProject = async () => {
-  if (marketplace.toBase58() == PublicKey.default.toBase58()) {
+  const account = await connection.getAccountInfo(marketplace);
+
+  if (!account) {
     const name = "Penny NFT Marketplace";
+    console.log(`Initializing ${name}...`);
+
     const result = await createInitializeMarketplaceTx(
       name,
       0,
@@ -162,6 +168,7 @@ export const initProject = async () => {
     await execTx(result.tx, connection, payer);
 
     marketplace = result.marketplace;
+    console.log("🟢 Done!");
   }
 
   console.log("Marketplace: ", marketplace.toBase58());
@@ -172,18 +179,30 @@ export const initProject = async () => {
  */
 export const createAuctionListing = async (
   buyoutPrice: number,
-  initialDuration: number,
+  initialDurationInSlots: number,
   seller: anchor.web3.Keypair,
   mint: PublicKey,
   collection: PublicKey
 ) => {
+  const timerExtensionInSlots = 12;
+
+  const currentSlot = await provider.connection.getSlot();
+
   let config = {
     bidIncrement: new BN(buyoutPrice / 1000),
-    timerExtension: new BN(20 * 1000), // 20 seconds
-    startTimestamp: new BN(Date.now()),
-    initialDuration: new BN(initialDuration), // 30 minutes
+    timerExtensionInSlots: new BN(timerExtensionInSlots), // 12 slots ~ 5 seconds
+    startTimeInSlots: new BN(currentSlot),
+    initialDurationInSlots: new BN(initialDurationInSlots),
     buyoutPrice: new BN(buyoutPrice),
   };
+
+  console.log("Creating auction with config: ", {
+    bidIncrement: config.bidIncrement.toNumber(),
+    timerExtensionInSlots: config.timerExtensionInSlots.toNumber(),
+    startTimestamp: config.startTimeInSlots.toNumber(),
+    initialDurationInSlots: config.initialDurationInSlots.toNumber(),
+    buyoutPrice: config.buyoutPrice.toNumber(),
+  });
 
   const sellerWallet = new NodeWallet(seller);
   const sellerAta = getAssociatedTokenAddressSync(mint, seller.publicKey);
@@ -289,19 +308,25 @@ export const findAuctionProgramAddress = (mint: PublicKey) => {
  */
 export const getAuctionInfo = async (auction: PublicKey) => {
   const auctionInfo = await program.account.listing.fetch(auction);
+  const escrow = getAssociatedTokenAddressSync(auctionInfo.mint, auction, true);
 
   console.log("Auction Address:", auction.toBase58());
   return {
-    mint: auctionInfo.mint.toBase58(),
-    seller: auctionInfo.seller.toBase58(),
-    bidCost: auctionInfo.bidCost.toNumber(),
-    currentBid: auctionInfo.currentBid.toNumber(),
-    highestBidder: auctionInfo.highestBidder.toBase58(),
-    timerExtension: auctionInfo.timerExtension.toNumber(),
-    startTime: new Date(auctionInfo.startTime.toNumber()),
-    endTime: new Date(auctionInfo.endTime.toNumber()),
-    isActive: auctionInfo.isActive,
-    buyoutPrice: auctionInfo.buyoutPrice.toNumber(),
+    state: {
+      mint: auctionInfo.mint.toBase58(),
+      seller: auctionInfo.seller.toBase58(),
+      bidCost: auctionInfo.bidCost.toNumber(),
+      currentBid: auctionInfo.currentBid.toNumber(),
+      highestBidder: auctionInfo.highestBidder.toBase58(),
+      timerExtensionInSlots: auctionInfo.timerExtensionInSlots.toNumber(),
+      startTimeInSlots: auctionInfo.startTimeInSlots.toNumber(),
+      endTimeInSlots: auctionInfo.endTimeInSlots.toNumber(),
+      isActive: auctionInfo.isActive,
+      buyoutPrice: auctionInfo.buyoutPrice.toNumber(),
+    },
+    relatedAccounts: {
+      escrow: escrow.toBase58(),
+    },
   };
 };
 
