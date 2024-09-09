@@ -37,8 +37,7 @@ export const createInitializeMarketplaceTx = async (
     [utils.bytes.utf8.encode(TREASURY_SEED), marketplace.toBuffer()],
     program.programId
   );
-
-  console.log("Treasury: ", rewardsMint.toBase58());
+  console.log("Treasury: ", treasury.toBase58());
 
   const bidsVault = getAssociatedTokenAddressSync(
     bidTokenMint,
@@ -85,6 +84,8 @@ export const createListTx = async (
     ],
     program.programId
   );
+
+  console.log("Listing: ", listing.toBase58());
 
   const escrow = getAssociatedTokenAddressSync(nftMint, listing, true);
 
