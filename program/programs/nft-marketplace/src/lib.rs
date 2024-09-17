@@ -18,13 +18,15 @@ pub mod nft_marketplace {
         ctx.accounts.init(name, fee, &ctx.bumps)
     }
 
-    pub fn list(
-        ctx: Context<List>,
+    pub fn list<'info>(
+        //ctx: Context<List>,
+        ctx: Context<'_, '_, '_, 'info, List<'info>>,
         bid_increment: u64,
         timer_extension_in_slots: u64,
         start_time_in_slots: u64,
         initial_duration_in_slots: u64,
         buyout_price: u64,
+        amount: u64,
     ) -> Result<()> {
         ctx.accounts.create_listing(
             bid_increment,
@@ -34,7 +36,9 @@ pub mod nft_marketplace {
             buyout_price,
             &ctx.bumps,
         )?;
-        ctx.accounts.transfer_to_escrow()
+
+        ctx.accounts
+            .transfer_to_escrow(amount, ctx.remaining_accounts)
     }
 
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {

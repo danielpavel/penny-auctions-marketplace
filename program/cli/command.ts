@@ -63,8 +63,12 @@ commander
   .option("-a, --account <address>", "Account address")
   .option("-c, --cluster <value>", "Solana Cluster")
   .option("-k, --keypair <path>", "Seller address")
+  .option(
+    "-p, --programmable",
+    "Have this flag if you want to mint a programmable NFT"
+  )
   .action(async (options) => {
-    const { account, cluster, keypair } = options;
+    const { account, cluster, keypair, programmable } = options;
 
     const address = new PublicKey(account);
 
@@ -72,7 +76,7 @@ commander
     initializeUmi();
 
     try {
-      await mintTestNft(address);
+      await mintTestNft(address, programmable);
     } catch (err) {
       console.error("Error minting NFT:", err);
     }

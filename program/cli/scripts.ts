@@ -125,16 +125,16 @@ export const initTestNftCollection = async () => {
 /**
  * Create Test NFT
  */
-export const mintTestNft = async (toAccount: PublicKey) => {
-  console.log(`Minting NFT to ${toAccount.toBase58()}...`);
+export const mintTestNft = async (toAccount: PublicKey, pNft: boolean) => {
+  console.log(`Minting ${pNft ? "pNFT" : "NFT"} to ${toAccount.toBase58()}...`);
 
   const rand = Math.floor(Math.random() * 100);
-  //const anchorTypedCollection = new web3.PublicKey(collection);
   const { mint, ata } = await mintNftAndVerify({
     umi,
     randomNumber: rand,
     account: toAccount,
     collection,
+    pNft,
   });
 
   console.log("Mint: ", mint.toBase58());

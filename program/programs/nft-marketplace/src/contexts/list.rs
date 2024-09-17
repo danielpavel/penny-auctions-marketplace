@@ -1,12 +1,20 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    metadata::{MasterEditionAccount, Metadata, MetadataAccount},
+    metadata::{
+        mpl_token_metadata::{
+            instructions::TransferCpiBuilder, programs::MPL_TOKEN_METADATA_ID, types::TransferArgs,
+        },
+        MasterEditionAccount, Metadata, MetadataAccount,
+    },
     token::Token,
     token_interface::{transfer_checked, Mint, TokenAccount, TransferChecked},
 };
 
-use crate::state::{Listing, Marketplace};
+use crate::{
+    state::{Listing, Marketplace},
+    utils::MarketplaceErrorCode,
+};
 
 #[derive(Accounts)]
 pub struct List<'info> {
@@ -27,7 +35,7 @@ pub struct List<'info> {
         seeds = [b"marketplace".as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
-    marketplace: Account<'info, Marketplace>,
+    marketplace: Box<Account<'info, Marketplace>>,
 
     pub mint: InterfaceAccount<'info, Mint>,
     pub collection: InterfaceAccount<'info, Mint>,
@@ -48,24 +56,27 @@ pub struct List<'info> {
     escrow: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
+        mut,
         seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref()],
         seeds::program = metadata_program.key(),
         bump,
         constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection.key().as_ref(),
         constraint = metadata.collection.as_ref().unwrap().verified == true,
     )]
-    pub metadata: Account<'info, MetadataAccount>,
+    pub metadata: Box<Account<'info, MetadataAccount>>,
 
     #[account(
     seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref(), b"edition"],
         seeds::program = metadata_program.key(),
         bump
     )]
-    pub master_edition: Account<'info, MasterEditionAccount>,
+    pub master_edition: Box<Account<'info, MasterEditionAccount>>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub metadata_program: Program<'info, Metadata>,
+    /// CHECK: The sysvar instructions account. This account is checked in metadata transfer
+    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> List<'info> {
@@ -100,16 +111,79 @@ impl<'info> List<'info> {
         Ok(())
     }
 
-    pub fn transfer_to_escrow(&mut self) -> Result<()> {
-        let accounts = TransferChecked {
-            from: self.seller_ata.to_account_info(),
-            to: self.escrow.to_account_info(),
-            mint: self.mint.to_account_info(),
-            authority: self.seller.to_account_info(),
-        };
+    pub fn transfer_to_escrow<'a>(
+        &mut self,
+        amount: u64,
+        remaining_accounts: &'a [AccountInfo<'info>],
+    ) -> Result<()> {
+        let remaining_accounts = &mut remaining_accounts.iter();
 
-        let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
+        match next_account_info(remaining_accounts) {
+            Ok(metadata_program) => {
+                require!(
+                    metadata_program.key() == MPL_TOKEN_METADATA_ID,
+                    MarketplaceErrorCode::InvalidMetadataProgram
+                );
 
-        transfer_checked(cpi_context, 1, self.mint.decimals)
+                let seller_ata = self.seller_ata.to_account_info();
+                let seller = self.seller.to_account_info();
+                let escrow = self.escrow.to_account_info();
+                let listing = self.listing.to_account_info();
+                let mint = self.mint.to_account_info();
+                let metadata = self.metadata.to_account_info();
+                let system_program = self.system_program.to_account_info();
+                let token_program = self.token_program.to_account_info();
+                let associated_token_program = self.associated_token_program.to_account_info();
+                let sysvar_instructions = self.sysvar_instructions.to_account_info();
+
+                let edition = next_account_info(remaining_accounts).ok();
+                let owner_tr = next_account_info(remaining_accounts).ok();
+                let destination_tr = next_account_info(remaining_accounts).ok();
+                let auth_rules_program = next_account_info(remaining_accounts).ok();
+                let auth_rules = next_account_info(remaining_accounts).ok();
+
+                // Create TransferArgs
+                let transfer_args = TransferArgs::V1 {
+                    amount,
+                    authorization_data: None,
+                };
+
+                let mut mpl_cpi_transfer = TransferCpiBuilder::new(metadata_program);
+
+                mpl_cpi_transfer
+                    .token(&seller_ata)
+                    .token_owner(&seller)
+                    .destination_token(&escrow)
+                    .destination_owner(&listing)
+                    .mint(&mint)
+                    .metadata(&metadata)
+                    .edition(edition)
+                    .token_record(owner_tr)
+                    .destination_token_record(destination_tr)
+                    .authority(&seller)
+                    .payer(&seller)
+                    .system_program(&system_program)
+                    .sysvar_instructions(&sysvar_instructions)
+                    .spl_token_program(&token_program)
+                    .spl_ata_program(&associated_token_program)
+                    .authorization_rules_program(auth_rules_program)
+                    .authorization_rules(auth_rules)
+                    .transfer_args(transfer_args);
+
+                mpl_cpi_transfer.invoke().map_err(Into::into)
+            }
+            Err(_) => {
+                let accounts = TransferChecked {
+                    from: self.seller_ata.to_account_info(),
+                    to: self.escrow.to_account_info(),
+                    mint: self.mint.to_account_info(),
+                    authority: self.seller.to_account_info(),
+                };
+
+                let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
+
+                transfer_checked(cpi_context, amount, self.mint.decimals)
+            }
+        }
     }
 }

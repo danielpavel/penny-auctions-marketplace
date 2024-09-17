@@ -23,4 +23,8 @@ pub enum MarketplaceErrorCode {
     CannotDelistWithActiveBidder,
     #[msg("Cannot delist auction with active current bid price")]
     CannotDelistWithActiveCurrentBidPrice,
+
+    // Copied from mpl_token_metadata
+    #[msg("Invalid metadata program")]
+    InvalidMetadataProgram,
 }

@@ -1,6 +1,13 @@
-import { generateSigner, percentAmount, Umi } from "@metaplex-foundation/umi";
+import {
+  generateSigner,
+  percentAmount,
+  publicKey,
+  TransactionBuilder,
+  Umi,
+} from "@metaplex-foundation/umi";
 import {
   createNft,
+  createProgrammableNft,
   findMetadataPda,
   verifyCollectionV1,
 } from "@metaplex-foundation/mpl-token-metadata";
@@ -34,11 +41,13 @@ export async function mintNft({
   randomNumber,
   account,
   collection,
+  pNft,
 }: {
   umi: Umi;
   randomNumber: number;
   account: PublicKey;
   collection: PublicKey;
+  pNft: boolean;
 }) {
   const mint = generateSigner(umi);
 
@@ -50,17 +59,38 @@ export async function mintNft({
     );
     const owner = fromWeb3JsPublicKey(account);
 
-    const txBuilder = createNft(umi, {
-      name: `My Nft ${randomNumber}`,
-      mint,
-      token: fromWeb3JsPublicKey(ata),
-      tokenOwner: owner,
-      authority: umi.payer,
-      sellerFeeBasisPoints: percentAmount(5),
-      isCollection: false,
-      collection: { key: fromWeb3JsPublicKey(collection), verified: false },
-      uri: "https://arweave.net/123",
-    });
+    let txBuilder: TransactionBuilder = null;
+    if (pNft) {
+      // Decide on a ruleset for the Nft.
+      // Metaplex ruleset - publicKey("eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9")
+      // Compatability ruleset - publicKey("AdH2Utn6Fus15ZhtenW4hZBQnvtLgM1YCW2MfVp7pYS5")
+      //const ruleset = publicKey("eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9"); // or set a publicKey from above
+      const ruleset = null;
+
+      txBuilder = createProgrammableNft(umi, {
+        name: `My pNft ${randomNumber}`,
+        mint,
+        token: fromWeb3JsPublicKey(ata),
+        tokenOwner: owner,
+        sellerFeeBasisPoints: percentAmount(5),
+        isCollection: false,
+        collection: { key: fromWeb3JsPublicKey(collection), verified: false },
+        uri: "https://arweave.net/123",
+        ruleSet: ruleset,
+      });
+    } else {
+      txBuilder = createNft(umi, {
+        name: `My Nft ${randomNumber}`,
+        mint,
+        token: fromWeb3JsPublicKey(ata),
+        tokenOwner: owner,
+        authority: umi.payer,
+        sellerFeeBasisPoints: percentAmount(5),
+        isCollection: false,
+        collection: { key: fromWeb3JsPublicKey(collection), verified: false },
+        uri: "https://arweave.net/123",
+      });
+    }
 
     let result = await txBuilder.sendAndConfirm(umi);
 
@@ -79,11 +109,13 @@ export async function mintNftAndVerify({
   randomNumber,
   account,
   collection,
+  pNft,
 }: {
   umi: Umi;
   randomNumber: number;
   account: PublicKey;
   collection: PublicKey;
+  pNft: boolean;
 }) {
   try {
     const { mint, ata } = await mintNft({
@@ -91,6 +123,7 @@ export async function mintNftAndVerify({
       randomNumber,
       account,
       collection,
+      pNft,
     });
 
     // first find the metadata PDA to use later
@@ -113,7 +146,8 @@ export async function mintNftAndVerify({
 export async function createAndMintNftForCollection(
   umi: Umi,
   randomNumber: number,
-  account: PublicKey
+  account: PublicKey,
+  pNft?: boolean
 ) {
   try {
     const collection = await createCollectionNft(umi);
@@ -123,6 +157,7 @@ export async function createAndMintNftForCollection(
       randomNumber,
       account,
       collection: collection,
+      pNft,
     });
 
     // first find the metadata PDA to use later

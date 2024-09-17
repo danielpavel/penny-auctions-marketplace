@@ -6,7 +6,6 @@ use anchor_spl::{
         close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TransferChecked,
     },
 };
-use solana_program::system_instruction;
 
 use crate::{
     state::{Listing, Marketplace},
