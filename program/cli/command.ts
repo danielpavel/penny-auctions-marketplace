@@ -8,6 +8,7 @@ import {
   endAuction,
   findAuctionProgramAddress,
   getAllAuctions,
+  getAllMarketplaces,
   getAuctionInfo,
   getMarketplace,
   initBidTokenMint,
@@ -62,21 +63,23 @@ commander
   .description("Mint a new test NFT")
   .option("-a, --account <address>", "Account address")
   .option("-c, --cluster <value>", "Solana Cluster")
+  .option("--collection <value>", "NFT Collection address")
   .option("-k, --keypair <path>", "Seller address")
   .option(
     "-p, --programmable",
     "Have this flag if you want to mint a programmable NFT"
   )
   .action(async (options) => {
-    const { account, cluster, keypair, programmable } = options;
+    const { account, cluster, keypair, programmable, collection } = options;
 
     const address = new PublicKey(account);
+    const collectionAddress = new PublicKey(collection);
 
     await setClusterConfig(cluster, keypair);
     initializeUmi();
 
     try {
-      await mintTestNft(address, programmable);
+      await mintTestNft(address, collectionAddress, programmable);
     } catch (err) {
       console.error("Error minting NFT:", err);
     }
@@ -138,13 +141,15 @@ commander
   //.option("-a, --auction <address>", "Auction PDA address")
   .option("-n, --nft <address>", "NFT mint address")
   .option("-c, --cluster <value>", "Solana Cluster")
+  .option("-b, --bids <value>", "Mint of the bid token")
   .option("-k, --keypair <path>", "User address")
   .action(async (options) => {
     try {
-      const { nft, cluster, keypair } = options;
+      const { nft, cluster, keypair, bids } = options;
 
       try {
         const mint = new PublicKey(nft);
+        const bidsMint = new PublicKey(bids);
 
         await setClusterConfig(cluster, keypair);
 
@@ -153,7 +158,10 @@ commander
           { skipValidation: true }
         );
 
-        await placeBid(walletKeypair, mint);
+        console.log("Placing bid...");
+        console.log("with bidsMint", bidsMint.toBase58());
+        console.log("with mint", mint.toBase58());
+        await placeBid(walletKeypair, mint, bidsMint);
 
         console.log(
           `Bid placed on auction: ${findAuctionProgramAddress(mint)}`
@@ -253,15 +261,33 @@ commander
   });
 
 commander
+  .command("get-all-marketplaces")
+  .description("Get information on all marketplaces owned by this program")
+  .option("-c, --cluster <value>", "Solana Cluster")
+  .option("-k, --keypair <path>", "Path to keypair file")
+  .action(async (options) => {
+    try {
+      const { cluster, keypair } = options;
+
+      await setClusterConfig(cluster, keypair);
+
+      await getAllMarketplaces();
+    } catch (error) {
+      console.error("Error fetching marketplace info:", error);
+    }
+  });
+
+commander
   .command("mint-bid-token")
   .description("Mine bid tokens")
   .option("-a --amount <number>", "Address of the receiver wallet")
   .option("-r --receiver <address>", "Address of the receiver wallet")
   .option("-c, --cluster <value>", "Solana Cluster")
   .option("-k, --keypair <path>", "Path to keypair file")
+  .option("-m, --mint <value>", "Mint of the bid token")
   .action(async (options) => {
     try {
-      const { cluster, keypair, receiver, amount } = options;
+      const { cluster, keypair, receiver, amount, mint } = options;
 
       console.log("Amount:", amount);
       console.log("To:", receiver);
@@ -273,7 +299,7 @@ commander
       await setClusterConfig(cluster, keypair);
       initializeUmi();
 
-      await mintBidTokens(amount, to);
+      await mintBidTokens(amount, to, new PublicKey(mint));
     } catch (error) {
       console.error("Error fetching marketplace info:", error);
     }

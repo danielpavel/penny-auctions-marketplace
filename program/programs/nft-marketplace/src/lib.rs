@@ -5,6 +5,7 @@ declare_id!("ATxkTBH2cbC28hV7n37QZ5d9hsc2Xpoio4ZHYSYFGHou");
 pub mod constants;
 pub mod contexts;
 pub mod errors;
+pub mod events;
 pub mod state;
 pub mod utils;
 
@@ -38,7 +39,11 @@ pub mod nft_marketplace {
         )?;
 
         ctx.accounts
-            .transfer_to_escrow(amount, ctx.remaining_accounts)
+            .transfer_to_escrow(amount, ctx.remaining_accounts)?;
+
+        ctx.accounts.emit_listing_created();
+
+        Ok(())
     }
 
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
@@ -46,7 +51,7 @@ pub mod nft_marketplace {
     }
 
     pub fn delist(ctx: Context<Delist>) -> Result<()> {
-        ctx.accounts.withdraw_nft_and_close()
+        ctx.accounts.withdraw_and_close()
     }
 
     pub fn purchase(ctx: Context<Purchase>) -> Result<()> {

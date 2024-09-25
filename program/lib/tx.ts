@@ -3,7 +3,7 @@ import {
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SYSVAR_INSTRUCTIONS_PUBKEY } from "@solana/web3.js";
 
 import { NftMarketplace } from "../target/types/nft_marketplace";
 
@@ -98,6 +98,7 @@ export const createListTx = async (
     sellerAta,
     escrow,
     tokenProgram: TOKEN_PROGRAM_ID,
+    sysvarInstructions: SYSVAR_INSTRUCTIONS_PUBKEY,
   };
 
   const tx = new web3.Transaction();
@@ -109,7 +110,8 @@ export const createListTx = async (
         listingConfig.timerExtensionInSlots,
         listingConfig.startTimeInSlots,
         listingConfig.initialDurationInSlots,
-        listingConfig.buyoutPrice
+        listingConfig.buyoutPrice,
+        listingConfig.amount
       )
       .accounts(accounts)
       .instruction()
@@ -136,6 +138,10 @@ export const createPlaceBidTx = async (
     program.programId
   );
 
+  //console.log("[createPlaceBidTx] Listing: ", listing.toBase58());
+  //console.log("[createPlaceBidTx] nftMint: ", nftMint.toBase58());
+  //console.log("[createPlaceBidTx] bidTokenMint: ", bidTokenMint.toBase58());
+
   const bidderBidTokenATA = getAssociatedTokenAddressSync(bidTokenMint, bidder);
   const bidsVault = getAssociatedTokenAddressSync(
     bidTokenMint,
@@ -153,6 +159,11 @@ export const createPlaceBidTx = async (
     bidsVault,
     tokenProgram: TOKEN_PROGRAM_ID,
   };
+
+  console.log(
+    "Place bid tx with accounts:",
+    Object.values(accounts).map((a) => a.toBase58())
+  );
 
   const tx = new web3.Transaction();
 

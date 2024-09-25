@@ -4,8 +4,8 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
-use crate::errors::MarketplaceErrorCode;
-use crate::state::Marketplace;
+use crate::{constants::MARKET_INITIALIZED_LABEL, state::Marketplace};
+use crate::{errors::MarketplaceErrorCode, events::MarketplaceInitialized};
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -61,7 +61,7 @@ impl<'info> Initialize<'info> {
             MarketplaceErrorCode::MarketplaceNameTooLong
         );
 
-        self.marketplace.set_inner(Marketplace {
+        let inner = Marketplace {
             admin: self.admin.key(),
             bids_mint: self.bids_mint.key(),
             bids_vault: self.bids_vault.key(),
@@ -70,6 +70,14 @@ impl<'info> Initialize<'info> {
             bump: bumps.marketplace,
             rewards_bump: bumps.rewards_mint,
             treasury_bump: bumps.treasury,
+        };
+
+        self.marketplace.set_inner(inner.clone());
+
+        emit!(MarketplaceInitialized {
+            marketplace: self.marketplace.clone().into_inner(),
+            pubkey: self.marketplace.key(),
+            label: MARKET_INITIALIZED_LABEL.to_string()
         });
 
         Ok(())

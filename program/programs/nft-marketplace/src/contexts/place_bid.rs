@@ -6,6 +6,8 @@ use anchor_spl::{
 };
 
 use crate::{
+    constants::BID_PLACED_LABEL,
+    events::BidPlaced,
     state::{Listing, Marketplace},
     utils::{assert_auction_active, MarketplaceErrorCode},
 };
@@ -81,6 +83,14 @@ impl<'info> PlaceBid<'info> {
             .end_time_in_slots
             .checked_add(auction.timer_extension_in_slots)
             .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        emit!(BidPlaced {
+            bidder: self.bidder.key(),
+            listing: auction.key(),
+            current_bid: auction.current_bid,
+            end_time_in_slots: auction.end_time_in_slots,
+            label: BID_PLACED_LABEL.to_string(),
+        });
 
         Ok(())
     }

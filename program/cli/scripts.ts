@@ -26,7 +26,10 @@ import { createCollectionNft, mintNftAndVerify } from "../tests/utils/nft";
 
 import { initUmi } from "../tests/utils/umi";
 import { createBidToken } from "../tests/utils/bidToken";
-import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
+import {
+  fromWeb3JsPublicKey,
+  toWeb3JsPublicKey,
+} from "@metaplex-foundation/umi-web3js-adapters";
 import dotenv from "dotenv";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LISTING_SEED, REWARDS_SEED, TREASURY_SEED } from "../lib/constants";
@@ -103,10 +106,7 @@ export const initializeUmi = () => {
  * Create Bid Token Mint
  */
 export const initBidTokenMint = async () => {
-  if (bidTokenMint.toBase58() == PublicKey.default.toBase58()) {
-    console.warn("Bids mint not set. Creating a new one...");
-    bidTokenMint = toWeb3JsPublicKey((await createBidToken(umi)).publicKey);
-  }
+  bidTokenMint = toWeb3JsPublicKey((await createBidToken(umi)).publicKey);
 
   console.log("Bid Token Mint: ", bidTokenMint.toBase58());
 };
@@ -115,9 +115,7 @@ export const initBidTokenMint = async () => {
  * Create Test NFT
  */
 export const initTestNftCollection = async () => {
-  if (collection.toBase58() == PublicKey.default.toBase58()) {
-    collection = await createCollectionNft(umi);
-  }
+  collection = await createCollectionNft(umi);
 
   console.log("Collection: ", collection.toBase58());
 };
@@ -125,8 +123,16 @@ export const initTestNftCollection = async () => {
 /**
  * Create Test NFT
  */
-export const mintTestNft = async (toAccount: PublicKey, pNft: boolean) => {
-  console.log(`Minting ${pNft ? "pNFT" : "NFT"} to ${toAccount.toBase58()}...`);
+export const mintTestNft = async (
+  toAccount: PublicKey,
+  collection: PublicKey,
+  pNft: boolean
+) => {
+  console.log(
+    `Minting ${
+      pNft ? "pNFT" : "NFT"
+    } into Collection ${collection.toBase58()} to ${toAccount.toBase58()}...`
+  );
 
   const rand = Math.floor(Math.random() * 100);
   const { mint, ata } = await mintNftAndVerify({
@@ -194,6 +200,7 @@ export const createAuctionListing = async (
     startTimeInSlots: new BN(currentSlot),
     initialDurationInSlots: new BN(initialDurationInSlots),
     buyoutPrice: new BN(buyoutPrice),
+    amount: new BN(1),
   };
 
   console.log("Creating auction with config: ", {
@@ -227,9 +234,13 @@ export const createAuctionListing = async (
  */
 export const placeBid = async (
   bidder: anchor.web3.Keypair,
-  mint: PublicKey
+  mint: PublicKey,
+  bidTokenMint: PublicKey
 ) => {
   const bidderWallet = new NodeWallet(bidder);
+
+  console.log("[place_bid] mint", mint.toBase58());
+  console.log("[place_bid] bidTokenMint", bidTokenMint.toBase58());
 
   const tx = await createPlaceBidTx(
     bidder.publicKey,
@@ -376,10 +387,21 @@ export const getMarketplace = async (marketplace: PublicKey) => {
   console.log("--------------------------");
 };
 
-export const mintBidTokens = async (amount: number, to: PublicKey) => {
+export const getAllMarketplaces = async () => {
+  const marketplaces = await program.account.marketplace.all();
+  marketplaces.forEach(async (marketplace) => {
+    console.log("Marketplace: ", await getMarketplace(marketplace.publicKey));
+  });
+};
+
+export const mintBidTokens = async (
+  amount: number,
+  to: PublicKey,
+  mint: PublicKey
+) => {
   console.log(`Minting ${amount} bid tokens to ${to.toBase58()}...`);
 
-  await mintBidToken(umi, bidTokenMint, amount * 10 ** 6, to);
+  await mintBidToken(umi, mint, amount * 10 ** 6, to);
 
   console.log("✅ Done!");
 };

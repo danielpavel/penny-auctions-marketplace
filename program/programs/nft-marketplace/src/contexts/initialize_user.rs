@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::state::UserAccount;
+use crate::{constants::USER_CREATED_LABEL, events::UserCreated, state::UserAccount};
 
 #[derive(Accounts)]
 pub struct InitializeUser<'info> {
@@ -26,6 +26,12 @@ impl<'info> InitializeUser<'info> {
             total_auctions_won: 0,
             points: 0,
             bump: bumps.user_account,
+        });
+
+        emit!(UserCreated {
+            user: self.user_account.clone().into_inner(),
+            pubkey: self.user.key(),
+            label: USER_CREATED_LABEL.to_string()
         });
 
         Ok(())

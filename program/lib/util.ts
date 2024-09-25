@@ -45,6 +45,6 @@ export const execTx = async (
 
     console.log("err ", confirmed.value.err);
   } catch (e) {
-    console.log(e);
+    throw new Error("Error executing transaction" + e);
   }
 };

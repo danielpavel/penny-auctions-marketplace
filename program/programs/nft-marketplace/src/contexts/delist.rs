@@ -9,6 +9,8 @@ use anchor_spl::{
 };
 
 use crate::{
+    constants::LISTING_DELISTED_LABEL,
+    events::ListingDelisted,
     state::{Listing, Marketplace},
     utils::{assert_auction_delist_eligible, assert_auction_ended},
 };
@@ -40,7 +42,7 @@ pub struct Delist<'info> {
         seeds = [b"listing", marketplace.key().as_ref(), maker_mint.key().as_ref()],
         bump = listing.bump
     )]
-    listing: Box<Account<'info, Listing>>,
+    pub listing: Box<Account<'info, Listing>>,
 
     #[account(
         mut,
@@ -56,7 +58,7 @@ pub struct Delist<'info> {
 }
 
 impl<'info> Delist<'info> {
-    pub fn withdraw_nft_and_close(&mut self) -> Result<()> {
+    pub fn withdraw_and_close(&mut self) -> Result<()> {
         assert_auction_ended(&self.listing)?;
         assert_auction_delist_eligible(&self.listing)?;
 
@@ -96,6 +98,13 @@ impl<'info> Delist<'info> {
             &signer_seeds,
         );
 
-        close_account(ctx)
+        close_account(ctx)?;
+
+        emit!(ListingDelisted {
+            listing_pubkey: self.listing.key(),
+            label: LISTING_DELISTED_LABEL.to_string(),
+        });
+
+        Ok(())
     }
 }

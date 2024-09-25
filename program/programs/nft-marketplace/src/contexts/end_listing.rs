@@ -8,6 +8,8 @@ use anchor_spl::{
 };
 
 use crate::{
+    constants::LISTING_ENDED_LABEL,
+    events::ListingEnded,
     state::{Listing, Marketplace},
     utils::{assert_auction_ended, assert_highest_bidder, transfer_sol, MarketplaceErrorCode},
 };
@@ -88,14 +90,19 @@ impl<'info> EndListing<'info> {
         )?;
 
         // Transfer the NFT to the highest bidder
-        self.withdraw_nft_and_close()?;
+        self.withdraw_and_close()?;
 
         self.listing.is_active = false;
+
+        emit!(ListingEnded {
+            listing_pubkey: self.listing.key(),
+            label: LISTING_ENDED_LABEL.to_string(),
+        });
 
         Ok(())
     }
 
-    pub fn withdraw_nft_and_close(&mut self) -> Result<()> {
+    pub fn withdraw_and_close(&mut self) -> Result<()> {
         let bump = [self.listing.bump];
         let signer_seeds = [&[
             b"listing",

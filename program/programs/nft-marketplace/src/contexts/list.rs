@@ -12,6 +12,8 @@ use anchor_spl::{
 };
 
 use crate::{
+    constants::LISTING_CREATED_LABEL,
+    events::ListingCreated,
     state::{Listing, Marketplace},
     utils::MarketplaceErrorCode,
 };
@@ -185,5 +187,15 @@ impl<'info> List<'info> {
                 transfer_checked(cpi_context, amount, self.mint.decimals)
             }
         }
+    }
+
+    pub fn emit_listing_created(&self) {
+        let inner_listing = self.listing.clone().into_inner();
+
+        emit!(ListingCreated {
+            listing: inner_listing,
+            pubkey: self.listing.key(),
+            label: LISTING_CREATED_LABEL.to_string(),
+        });
     }
 }
