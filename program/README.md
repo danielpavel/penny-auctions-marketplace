@@ -7,26 +7,24 @@
 <h4 align="center">Beat the Market: Snag Top-Tier NFTs for Lamports</h4>
 
 <p align="center">
-  <a href="#key-features">User Stories</a> •
-  <a href="#key-features">Architectural Diagram</a> •
+  <a href="#description">Description</a> •
   <a href="#key-features">Key Features</a> •
-  <a href="#how-to-use">How To Use</a>
+  <a href="#how-to-use">How To Use</a> •
+  <a href="#how-to-use">Future Work</a>
 </p>
 
-## User Stories
+## Description
 
-<a href="User-Stories.md">User Stories</a>
-
-## Architectural Diagram
-
-<img src="https://shdw-drive.genesysgo.net/AjrX4GfkKrStohvx5yR7PYk9mJPDu2kkf1oGWADJRfwi/arch-diagram.png" alt="Sandcastle Deals" width="700">
+This repository hosts the Solana program implementation of the Sandcastle Deals Marketplace.
 
 ## Key Features
 
-- **Blockchain Transparency**: All auction activities are recorded on-chain, ensuring full transparency and preventing manipulation.
-- **NFT Integration**: Bid on unique digital assets backed by the security of the Solana blockchain.
-- **Decentralized Escrow**: NFTs are held in a secure, decentralized escrow until the auction concludes.
-- **Automatic Time Extension**: Auction end times are automatically extended with each bid, preventing last-second sniping.
+- **`initialize`** -> initializes the marketplace account state
+- **`list`** -> create a listing account state -> transfer the nft fot that listing to an escrow account
+- **`delist`** -> withdraws a listing which has no bids
+- **`place_bid`** -> places a bid for that listing which means transfering a bid token to the markeplace treasury and the listing account state will bump the end time by 20 seconds - write the user that placed a bid as "last bidder" and also increase the current_bid price by a fixed amount
+- **`end_list`** -> user pays the current_bid amount in sol in the marketplace treasury and receives the nft
+- **`initialize_user`** -> initializes user state account that holds information such as: _total_bids_placed_, _total_auctions_participated_, _total_auctions_won_, _reward_points_
 
 ## How To Use
 
@@ -109,9 +107,33 @@ $ yarn script mint-bid-token -c localhost -k ./wallets/admin.json --receiver <us
 $ yarn script place-bid -c localhost -k ./wallets/user2.json -n <nft_mint_pubkey> -b <bid_token_mint>
 ```
 
+**End an auction**
+
+```bash
+$ yarn script end-auction -c localhost -w <winner_wallet> -n <nft_mint_pubkey>
+```
+
+**Show auction information**
+
+```bash
+$ yarn script get-auction-info -a <nft_mint_pubkey> -c localhost -k ./wallets/admin.json
+```
+
+**Show marketplace information**
+
+```bash
+$ yarn script get-marketplace-info -c localhost -k ./wallets/admin.json -a <marketplace_pda_pubkey>
+```
+
+## Future Work
+
+Further improvements are on the horizon such as:
+
+1. Add extra seed when creating a listing such that the listing account of a subsequent listing of the same NFT will not collide with the 1st
+2. Add support for Metaplex Core Assets
+
 ## 👋
 
 > GitHub [@danielpavel](https://github.com/danielpavel)
 > Twitter [@\_daneilpavel](https://twitter.com/_danielpavel)
 > Telegram [@\_daneilpavel19](https://t.me/_danielpavel19)
-
