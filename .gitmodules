@@ -1,0 +1,3 @@
+[submodule "indexer"]
+	path = indexer
+	url = https://github.com/danielpavel/nftsforless-indexer.git
