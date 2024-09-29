@@ -29,8 +29,12 @@ pub fn assert_auction_ended(listing: &Account<Listing>) -> Result<()> {
     Ok(())
 }
 
-pub fn assert_highest_bidder(listing: &Account<Listing>, bidder: &AccountInfo) -> Result<()> {
-    if listing.highest_bidder.key() != bidder.key() {
+pub fn assert_allowed_claimer(listing: &Account<Listing>, bidder: &AccountInfo) -> Result<()> {
+    if listing.highest_bidder.key() == Pubkey::default() {
+        if listing.seller.key() != bidder.key() {
+            return err!(MarketplaceErrorCode::ClaimerIsNotSeller);
+        }
+    } else if listing.highest_bidder.key() != bidder.key() {
         return err!(MarketplaceErrorCode::ClaimerIsNotHighestBidder);
     }
 

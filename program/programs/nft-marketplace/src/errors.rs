@@ -6,6 +6,8 @@ pub enum MarketplaceErrorCode {
     MarketplaceNameTooLong,
     #[msg("Only the highest bidder can claim the auction")]
     ClaimerIsNotHighestBidder,
+    #[msg("Only the listing seller can claim this auction")]
+    ClaimerIsNotSeller,
     #[msg("You are already the highest bidder")]
     BidderIsHighestBidder,
     #[msg("The auction is not active")]

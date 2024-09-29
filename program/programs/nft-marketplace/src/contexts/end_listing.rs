@@ -11,7 +11,7 @@ use crate::{
     constants::LISTING_ENDED_LABEL,
     events::ListingEnded,
     state::{Listing, Marketplace},
-    utils::{assert_auction_ended, assert_highest_bidder, transfer_sol, MarketplaceErrorCode},
+    utils::{assert_allowed_claimer, assert_auction_ended, transfer_sol, MarketplaceErrorCode},
 };
 
 #[derive(Accounts)]
@@ -79,7 +79,7 @@ impl<'info> EndListing<'info> {
 
         require!(self.listing.is_active, MarketplaceErrorCode::AuctionEnded);
         assert_auction_ended(&self.listing)?;
-        assert_highest_bidder(&self.listing, &self.user.to_account_info())?;
+        assert_allowed_claimer(&self.listing, &self.user.to_account_info())?;
 
         // Transfer the current_bid price to treasury
         transfer_sol(
