@@ -327,6 +327,7 @@ export const getAuctionInfo = async (auction: PublicKey) => {
       mint: auctionInfo.mint.toBase58(),
       seller: auctionInfo.seller.toBase58(),
       bidCost: auctionInfo.bidCost.toNumber(),
+      bidIncrement: auctionInfo.bidIncrement.toNumber(),
       currentBid: auctionInfo.currentBid.toNumber(),
       highestBidder: auctionInfo.highestBidder.toBase58(),
       timerExtensionInSlots: auctionInfo.timerExtensionInSlots.toNumber(),
