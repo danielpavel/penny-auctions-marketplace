@@ -3,9 +3,7 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::{MasterEditionAccount, Metadata, MetadataAccount},
     token::Token,
-    token_interface::{
-        close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TransferChecked,
-    },
+    token_interface::{close_account, CloseAccount, Mint, TokenAccount},
 };
 
 use crate::{
@@ -117,7 +115,7 @@ impl<'info> EndListing<'info> {
         )?;
 
         // Transfer the NFT to the user
-        self.withdraw_and_close2(amount, remaining_accounts)?;
+        self.withdraw_and_close(amount, remaining_accounts)?;
 
         self.listing.is_active = false;
 
@@ -129,7 +127,7 @@ impl<'info> EndListing<'info> {
         Ok(())
     }
 
-    pub fn withdraw_and_close2<'a>(
+    pub fn withdraw_and_close<'a>(
         &mut self,
         amount: u64,
         remaining_accounts: &'a [AccountInfo<'info>],
@@ -157,46 +155,6 @@ impl<'info> EndListing<'info> {
             remaining_accounts,
             Some(signer_seeds),
         )?;
-
-        // Close the escrow account
-        let accounts = CloseAccount {
-            account: self.escrow.to_account_info(),
-            destination: self.seller.to_account_info(),
-            authority: self.listing.to_account_info(),
-        };
-
-        let ctx = CpiContext::new_with_signer(
-            self.token_program.to_account_info(),
-            accounts,
-            &signer_seeds,
-        );
-
-        close_account(ctx)
-    }
-
-    pub fn withdraw_and_close(&mut self) -> Result<()> {
-        let bump = [self.listing.bump];
-        let signer_seeds = [&[
-            b"listing",
-            self.marketplace.to_account_info().key.as_ref(),
-            self.mint.to_account_info().key.as_ref(),
-            &bump,
-        ][..]];
-
-        let accounts = TransferChecked {
-            from: self.escrow.to_account_info(),
-            to: self.user_ata.to_account_info(),
-            mint: self.mint.to_account_info(),
-            authority: self.listing.to_account_info(),
-        };
-
-        let cpi_context = CpiContext::new_with_signer(
-            self.token_program.to_account_info(),
-            accounts,
-            &signer_seeds,
-        );
-
-        transfer_checked(cpi_context, 1, self.mint.decimals)?;
 
         // Close the escrow account
         let accounts = CloseAccount {

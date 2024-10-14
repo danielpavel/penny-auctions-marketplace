@@ -65,7 +65,7 @@ pub fn transfer_asset<'info>(
                 .edition(edition)
                 .token_record(owner_tr)
                 .destination_token_record(destination_tr)
-                .authority(&auth_to)
+                .authority(&auth_from)
                 .payer(&auth_to)
                 .system_program(&system_program)
                 .sysvar_instructions(&sysvar_instructions)
@@ -75,7 +75,12 @@ pub fn transfer_asset<'info>(
                 .authorization_rules(auth_rules)
                 .transfer_args(transfer_args);
 
-            mpl_cpi_transfer.invoke().map_err(Into::into)
+            match transfer_seeds {
+                Some(signer_seeds) => mpl_cpi_transfer
+                    .invoke_signed(&signer_seeds)
+                    .map_err(Into::into),
+                None => mpl_cpi_transfer.invoke().map_err(Into::into),
+            }
         }
         Err(_) => {
             let accounts = TransferChecked {
@@ -85,7 +90,7 @@ pub fn transfer_asset<'info>(
                 authority: authority_from.clone(),
             };
 
-            match (transfer_seeds) {
+            match transfer_seeds {
                 Some(signer_seeds) => {
                     let cpi_context = CpiContext::new_with_signer(
                         token_program.to_account_info(),
@@ -101,9 +106,6 @@ pub fn transfer_asset<'info>(
                     transfer_checked(cpi_context, amount, mint.decimals)
                 }
             }
-
-            //let cpi_context = CpiContext::new(token_program.to_account_info(), accounts);
-            //transfer_checked(cpi_context, amount, mint.decimals)
         }
     }
 }

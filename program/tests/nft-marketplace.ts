@@ -5,6 +5,7 @@ import { NftMarketplace } from "../target/types/nft_marketplace";
 import { createAndMintNftForCollection } from "./utils/nft";
 import { initUmi } from "./utils/umi";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { getAccount } from "@solana/spl-token";
 
 import {
   findMetadataPda,
@@ -448,6 +449,7 @@ describe("nft-marketplace", () => {
   });
 
   it("End Auction", async () => {
+    const amount = 1;
     const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         anchor.utils.bytes.utf8.encode("listing"),
@@ -492,17 +494,19 @@ describe("nft-marketplace", () => {
       seller: user1.publicKey,
       userAta: user2NftAta,
       mint: nft.mint,
+      collection: nft.collection,
       listing,
       escrow,
       treasury,
       marketplace,
       bidsVault,
       tokenProgram: TOKEN_PROGRAM_ID,
+      sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
     };
 
     try {
       let tx = await program.methods
-        .endListing()
+        .endListing(new anchor.BN(amount))
         .accounts(accounts)
         .signers([user2])
         .rpc();
@@ -720,34 +724,190 @@ describe("nft-marketplace", () => {
     expect(escrowAccount.value.amount).to.equal("1");
   });
 
-  /*
-  it("Delist", async () => {
-    const [listing, _listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        anchor.utils.bytes.utf8.encode("listing"),
-        marketplace.toBuffer(),
-        nft.mint.toBuffer(),
-      ],
-      program.programId
-    );
+  it("Bid pNFT", async () => {
+    const [listing, _listingBump] =
+      anchor.web3.PublicKey.findProgramAddressSync(
+        [
+          anchor.utils.bytes.utf8.encode("listing"),
+          marketplace.toBuffer(),
+          pNft.mint.toBuffer(),
+        ],
+        program.programId
+      );
 
-    const escrow = await getAssociatedTokenAddress(nft.mint, listing, true);
+    let listingAccount = await program.account.listing.fetch(listing);
+
+    let oldEndTimeInSlots = listingAccount.endTimeInSlots.toNumber();
+    let bidIncrement = listingAccount.bidIncrement.toNumber();
+    let timerExtensionInSlots = listingAccount.timerExtensionInSlots.toNumber();
 
     let accounts = {
-      maker: user1.publicKey,
-      marketplace,
-      makerMint: nft.mint,
-      makerAta: nft.ata,
+      bidder: user2.publicKey,
+      bidderAta: user2BidTokenATA,
+      mint: pNft.mint,
       listing,
-      escrow,
+      marketplace,
+      bidsMint: bidTokenMint,
+      bidsVault,
       tokenProgram: TOKEN_PROGRAM_ID,
     };
 
     try {
       let tx = await program.methods
-        .delist()
+        .placeBid()
         .accounts(accounts)
-        .signers([user1])
+        .signers([user2])
+        .rpc();
+
+      listingAccount = await program.account.listing.fetch(listing);
+
+      expect(listingAccount.currentBid.toNumber()).to.equal(bidIncrement);
+      expect(listingAccount.highestBidder).to.deep.equal(user2.publicKey);
+      expect(listingAccount.endTimeInSlots.toNumber()).to.equal(
+        oldEndTimeInSlots + timerExtensionInSlots
+      );
+
+      // check one bid token was debited from user2
+      const user2Ata = await provider.connection.getTokenAccountBalance(
+        user2BidTokenATA
+      );
+      expect(user2Ata.value.uiAmount).to.equal(8);
+
+      // check one bid token has been credited to vault
+      let vaultBalance = await provider.connection.getTokenAccountBalance(
+        bidsVault
+      );
+      expect(vaultBalance.value.uiAmount).to.equal(2);
+
+      console.log("Bid 1 transaction signature", tx);
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  it("Delist / End auction pNFT", async () => {
+    const expectedTreasuryBalance = 4230000;
+    const amount = 1;
+    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        pNft.mint.toBuffer(),
+      ],
+      program.programId
+    );
+
+    let listingAccount = await program.account.listing.fetch(listing);
+
+    const _listingData = {
+      mint: listingAccount.mint.toBase58(),
+      seller: listingAccount.seller.toBase58(),
+      bidCost: listingAccount.bidCost.toNumber(),
+      currentBid: listingAccount.currentBid.toNumber(),
+      highestBidder: listingAccount.highestBidder.toBase58(),
+      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+      isActive: listingAccount.isActive,
+      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+      bump: listingAccount.bump,
+    };
+
+    //console.log("Listing Data:", listingData);
+
+    console.log("Sleeping for 50 slots...");
+    await new Promise((resolve) => setTimeout(resolve, 20 * 1000));
+
+    const userAta = getAssociatedTokenAddressSync(pNft.mint, user2.publicKey);
+    const escrow = getAssociatedTokenAddressSync(pNft.mint, listing, true);
+
+    let accounts = {
+      user: user2.publicKey,
+      seller: initializer.publicKey,
+      userAta: userAta,
+      mint: pNft.mint,
+      collection: pNft.collection,
+      listing,
+      escrow,
+      treasury,
+      marketplace,
+      bidsVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
+    };
+
+    const metadata = findMetadataPda(umi, {
+      mint: fromWeb3JsPublicKey(pNft.mint),
+    });
+    console.log("Metadata:", metadata.toString());
+    const metadataAccount = await fetchMetadata(umi, metadata);
+
+    const metadataProgram = new anchor.web3.PublicKey(
+      "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+    );
+    const edition = toWeb3JsPublicKey(
+      findMasterEditionPda(umi, {
+        mint: fromWeb3JsPublicKey(pNft.mint),
+      })[0]
+    );
+    const ownerTr = toWeb3JsPublicKey(
+      findTokenRecordPda(umi, {
+        mint: fromWeb3JsPublicKey(pNft.mint),
+        token: fromWeb3JsPublicKey(escrow),
+      })[0]
+    );
+    const destinationTr = toWeb3JsPublicKey(
+      findTokenRecordPda(umi, {
+        mint: fromWeb3JsPublicKey(pNft.mint),
+        token: fromWeb3JsPublicKey(userAta),
+      })[0]
+    );
+
+    const authRulesProgram = new anchor.web3.PublicKey(
+      "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
+    );
+
+    let authRules: anchor.web3.PublicKey;
+    //console.log("ProgrammableConfig", metadataAccount.programmableConfig);
+    if (
+      metadataAccount.programmableConfig.__option == "Some" &&
+      metadataAccount.programmableConfig.value.ruleSet.__option === "Some"
+    ) {
+      authRules = toWeb3JsPublicKey(
+        metadataAccount.programmableConfig.value.ruleSet.value
+      );
+    } else {
+      authRules = null;
+    }
+
+    let remainingAccounts = [
+      metadataProgram,
+      edition,
+      ownerTr,
+      destinationTr,
+      authRulesProgram,
+      ...(authRules ? [authRules] : []),
+    ].map((key) => {
+      let accountInfo = {
+        pubkey: key,
+        isWritable: key == ownerTr || key == destinationTr ? true : false,
+        isSigner: false,
+      };
+
+      return accountInfo;
+    });
+
+    try {
+      let computeUnitLimitTx =
+        anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
+          units: 400000,
+        });
+      let tx = await program.methods
+        .endListing(new anchor.BN(amount))
+        .accounts(accounts)
+        .preInstructions([computeUnitLimitTx])
+        .remainingAccounts(remainingAccounts)
+        .signers([user2])
         .rpc();
 
       console.log("Your transaction signature", tx);
@@ -755,24 +915,27 @@ describe("nft-marketplace", () => {
       console.error(error);
     }
 
-    const errorMessage = `Account does not exist or has no data ${listing.toBase58()}`;
+    listingAccount = await program.account.listing.fetch(listing);
+    expect(listingAccount.isActive).to.eq(false);
+
     try {
-      await program.account.listing.fetch(listing);
-    } catch (error) {
-      if (error instanceof Error) {
-        expect(error.message).to.deep.equal(errorMessage);
-      }
+      // check escrow ATA has been closed
+      await provider.connection.getTokenAccountBalance(escrow);
+    } catch (err) {
+      const msg =
+        "failed to get token account balance: Invalid param: could not find account";
+      expect(err.message).to.equal(msg);
     }
 
-    const vaultAccount = await provider.connection.getAccountInfo(
-      vault
+    const userAtaBalance = await provider.connection.getTokenAccountBalance(
+      userAta
     );
-    expect(vaultAccount).to.be.null;
+    expect(userAtaBalance.value.amount).to.equal("1");
 
-    const userAta = await provider.connection.getTokenAccountBalance(nft.ata);
-    expect(userAta.value.amount).to.equal("1");
+    // check treasury has received the current bid amount
+    const treasuryBalance = await provider.connection.getBalance(treasury);
+    expect(treasuryBalance).to.equal(expectedTreasuryBalance);
   });
-  */
 
   it("initialize user", async () => {
     const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
