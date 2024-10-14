@@ -7,6 +7,7 @@ pub mod contexts;
 pub mod errors;
 pub mod events;
 pub mod state;
+pub mod transfer;
 pub mod utils;
 
 pub use contexts::*;
@@ -62,7 +63,10 @@ pub mod nft_marketplace {
         ctx.accounts.place_bid()
     }
 
-    pub fn end_listing(ctx: Context<EndListing>) -> Result<()> {
-        ctx.accounts.end_listing()
+    pub fn end_listing<'info>(
+        ctx: Context<'_, '_, '_, 'info, EndListing<'info>>,
+        amount: u64,
+    ) -> Result<()> {
+        ctx.accounts.end_listing(amount, ctx.remaining_accounts)
     }
 }

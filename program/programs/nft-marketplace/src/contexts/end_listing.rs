@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
+    metadata::{MasterEditionAccount, Metadata, MetadataAccount},
     token::Token,
     token_interface::{
         close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TransferChecked,
@@ -11,6 +12,7 @@ use crate::{
     constants::LISTING_ENDED_LABEL,
     events::ListingEnded,
     state::{Listing, Marketplace},
+    transfer::transfer_asset,
     utils::{assert_allowed_claimer, assert_auction_ended, transfer_sol, MarketplaceErrorCode},
 };
 
@@ -38,6 +40,7 @@ pub struct EndListing<'info> {
         address = listing.mint
     )]
     pub mint: InterfaceAccount<'info, Mint>,
+    pub collection: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -56,6 +59,23 @@ pub struct EndListing<'info> {
 
     #[account(
         mut,
+        seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref()],
+        seeds::program = metadata_program.key(),
+        bump,
+        constraint = metadata.collection.as_ref().unwrap().key.as_ref() == collection.key().as_ref(),
+        constraint = metadata.collection.as_ref().unwrap().verified == true,
+    )]
+    pub metadata: Box<Account<'info, MetadataAccount>>,
+
+    #[account(
+    seeds = [b"metadata", metadata_program.key().as_ref(), mint.key().as_ref(), b"edition"],
+        seeds::program = metadata_program.key(),
+        bump
+    )]
+    pub master_edition: Box<Account<'info, MasterEditionAccount>>,
+
+    #[account(
+        mut,
         seeds = [b"marketplace".as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
@@ -71,10 +91,17 @@ pub struct EndListing<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub metadata_program: Program<'info, Metadata>,
+    /// CHECK: The sysvar instructions account. This account is checked in metadata transfer
+    pub sysvar_instructions: UncheckedAccount<'info>,
 }
 
 impl<'info> EndListing<'info> {
-    pub fn end_listing(&mut self) -> Result<()> {
+    pub fn end_listing<'a>(
+        &mut self,
+        amount: u64,
+        remaining_accounts: &'a [AccountInfo<'info>],
+    ) -> Result<()> {
         //let auction = self.listing;
 
         require!(self.listing.is_active, MarketplaceErrorCode::AuctionEnded);
@@ -89,8 +116,8 @@ impl<'info> EndListing<'info> {
             self.listing.current_bid,
         )?;
 
-        // Transfer the NFT to the highest bidder
-        self.withdraw_and_close()?;
+        // Transfer the NFT to the user
+        self.withdraw_and_close2(amount, remaining_accounts)?;
 
         self.listing.is_active = false;
 
@@ -100,6 +127,51 @@ impl<'info> EndListing<'info> {
         });
 
         Ok(())
+    }
+
+    pub fn withdraw_and_close2<'a>(
+        &mut self,
+        amount: u64,
+        remaining_accounts: &'a [AccountInfo<'info>],
+    ) -> Result<()> {
+        let bump = [self.listing.bump];
+        let signer_seeds = [&[
+            b"listing",
+            self.marketplace.to_account_info().key.as_ref(),
+            self.mint.to_account_info().key.as_ref(),
+            &bump,
+        ][..]];
+
+        transfer_asset(
+            amount,
+            &self.escrow.to_account_info(),
+            &self.user_ata.to_account_info(),
+            &self.listing.to_account_info(),
+            &self.user.to_account_info(),
+            &self.mint,
+            &self.metadata.to_account_info(),
+            &self.token_program,
+            &self.system_program,
+            &self.associated_token_program,
+            &self.sysvar_instructions,
+            remaining_accounts,
+            Some(signer_seeds),
+        )?;
+
+        // Close the escrow account
+        let accounts = CloseAccount {
+            account: self.escrow.to_account_info(),
+            destination: self.seller.to_account_info(),
+            authority: self.listing.to_account_info(),
+        };
+
+        let ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            &signer_seeds,
+        );
+
+        close_account(ctx)
     }
 
     pub fn withdraw_and_close(&mut self) -> Result<()> {

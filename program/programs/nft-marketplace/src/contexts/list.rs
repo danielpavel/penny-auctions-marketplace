@@ -15,6 +15,7 @@ use crate::{
     constants::LISTING_CREATED_LABEL,
     events::ListingCreated,
     state::{Listing, Marketplace},
+    transfer::transfer_asset,
     utils::MarketplaceErrorCode,
 };
 
@@ -47,7 +48,7 @@ pub struct List<'info> {
         associated_token::mint = mint,
         associated_token::authority = seller
     )]
-    seller_ata: InterfaceAccount<'info, TokenAccount>,
+    pub seller_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         init,
@@ -55,7 +56,7 @@ pub struct List<'info> {
         associated_token::mint = mint,
         associated_token::authority = listing,
     )]
-    escrow: InterfaceAccount<'info, TokenAccount>,
+    pub escrow: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -111,6 +112,28 @@ impl<'info> List<'info> {
         });
 
         Ok(())
+    }
+
+    pub fn transfer_to_escrow2<'a>(
+        &mut self,
+        amount: u64,
+        remaining_accounts: &'a [AccountInfo<'info>],
+    ) -> Result<()> {
+        transfer_asset(
+            amount,
+            &self.seller_ata.to_account_info(),
+            &self.escrow.to_account_info(),
+            &self.seller.to_account_info(),
+            &self.listing.to_account_info(),
+            &self.mint,
+            &self.metadata.to_account_info(),
+            &self.token_program,
+            &self.system_program,
+            &self.associated_token_program,
+            &self.sysvar_instructions,
+            remaining_accounts,
+            None,
+        )
     }
 
     pub fn transfer_to_escrow<'a>(
