@@ -32,7 +32,7 @@ pub struct PlaceBid<'info> {
     #[account(
         mut,
         has_one = mint,
-        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref()],
+        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
     listing: Box<Account<'info, Listing>>,

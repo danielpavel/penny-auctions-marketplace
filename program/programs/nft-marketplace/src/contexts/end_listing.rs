@@ -43,7 +43,7 @@ pub struct EndListing<'info> {
     #[account(
         mut,
         has_one = mint,
-        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref()],
+        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
     listing: Box<Account<'info, Listing>>,
@@ -133,10 +133,12 @@ impl<'info> EndListing<'info> {
         remaining_accounts: &'a [AccountInfo<'info>],
     ) -> Result<()> {
         let bump = [self.listing.bump];
+        let seed = self.listing.seed.to_le_bytes();
         let signer_seeds = [&[
             b"listing",
             self.marketplace.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
+            seed.as_ref(),
             &bump,
         ][..]];
 

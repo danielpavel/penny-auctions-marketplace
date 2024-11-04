@@ -5,7 +5,6 @@ import { NftMarketplace } from "../target/types/nft_marketplace";
 import { createAndMintNftForCollection } from "./utils/nft";
 import { initUmi } from "./utils/umi";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
-import { getAccount } from "@solana/spl-token";
 
 import {
   findMetadataPda,
@@ -25,6 +24,7 @@ import {
   fromWeb3JsPublicKey,
   toWeb3JsPublicKey,
 } from "@metaplex-foundation/umi-web3js-adapters";
+import { generateRandomU64Seed } from "./utils/utils";
 
 const confirmOpts: anchor.web3.ConfirmOptions = {
   preflightCommitment: "confirmed",
@@ -66,6 +66,9 @@ describe("nft-marketplace", () => {
   let treasury: anchor.web3.PublicKey;
   let bidTokenMint: anchor.web3.PublicKey;
   let bidsVault: anchor.web3.PublicKey;
+
+  let seed = generateRandomU64Seed();
+  let seedPnftListing = generateRandomU64Seed();
 
   let nft: Nft;
   let pNft: Nft;
@@ -112,6 +115,10 @@ describe("nft-marketplace", () => {
       console.log("[before] P Collection mint", pCollection.toString());
       console.log("[before] P Mint", pMint.toString());
       console.log("[before] P Ata", pAta.toString());
+
+      console.log("-----------------------------------");
+      console.log("[before] seed", seed.toString());
+      console.log("[before] pNFT seed", seedPnftListing.toString());
 
       nft = { mint, ata, collection };
       pNft = { mint: pMint, ata: pAta, collection: pCollection };
@@ -240,9 +247,12 @@ describe("nft-marketplace", () => {
         anchor.utils.bytes.utf8.encode("listing"),
         marketplace.toBuffer(),
         nft.mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
     );
+
+    console.log("[List][listing] ", listing.toBase58());
 
     const escrow = getAssociatedTokenAddressSync(nft.mint, listing, true);
     const currentSlot = await provider.connection.getSlot();
@@ -259,6 +269,7 @@ describe("nft-marketplace", () => {
       initialDuration: new anchor.BN(initialDurationInSlots), // 24 slots ~ 10 seconds
       buyoutPrice: new anchor.BN(price),
       amount: new anchor.BN(1),
+      seed,
     };
 
     let accounts = {
@@ -276,6 +287,7 @@ describe("nft-marketplace", () => {
     try {
       let tx = await program.methods
         .list(
+          listingConfig.seed,
           listingConfig.bidIncrement,
           listingConfig.timerExtension,
           listingConfig.startTimestamp,
@@ -294,19 +306,19 @@ describe("nft-marketplace", () => {
 
     const listingAccount = await program.account.listing.fetch(listing);
 
-    const listingData = {
-      mint: listingAccount.mint.toBase58(),
-      seller: listingAccount.seller.toBase58(),
-      bidCost: listingAccount.bidCost.toNumber(),
-      currentBid: listingAccount.currentBid.toNumber(),
-      highestBidder: listingAccount.highestBidder.toBase58(),
-      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
-      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
-      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
-      isActive: listingAccount.isActive,
-      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
-      bump: listingAccount.bump,
-    };
+    //const listingData = {
+    //  mint: listingAccount.mint.toBase58(),
+    //  seller: listingAccount.seller.toBase58(),
+    //  bidCost: listingAccount.bidCost.toNumber(),
+    //  currentBid: listingAccount.currentBid.toNumber(),
+    //  highestBidder: listingAccount.highestBidder.toBase58(),
+    //  timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+    //  startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+    //  endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+    //  isActive: listingAccount.isActive,
+    //  buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+    //  bump: listingAccount.bump,
+    //};
 
     //console.log("Listing Data:", listingData);
 
@@ -332,6 +344,7 @@ describe("nft-marketplace", () => {
       true
     );
     expect(listingAccount.bump).to.equal(listingBump);
+    expect(listingAccount.seed.eq(seed)).eq(true);
 
     // Check seller ATA has been debited
     const sellerAta = await provider.connection.getTokenAccountBalance(nft.ata);
@@ -345,15 +358,17 @@ describe("nft-marketplace", () => {
   });
 
   it("Bid", async () => {
-    const [listing, _listingBump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [
-          anchor.utils.bytes.utf8.encode("listing"),
-          marketplace.toBuffer(),
-          nft.mint.toBuffer(),
-        ],
-        program.programId
-      );
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        nft.mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    console.log("[Bid][listing] ", listing.toBase58());
 
     let listingAccount = await program.account.listing.fetch(listing);
 
@@ -450,30 +465,33 @@ describe("nft-marketplace", () => {
 
   it("End Auction", async () => {
     const amount = 1;
-    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         anchor.utils.bytes.utf8.encode("listing"),
         marketplace.toBuffer(),
         nft.mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
     );
 
+    console.log("[End][listing] ", listing.toBase58());
+
     let listingAccount = await program.account.listing.fetch(listing);
 
-    const listingData = {
-      mint: listingAccount.mint.toBase58(),
-      seller: listingAccount.seller.toBase58(),
-      bidCost: listingAccount.bidCost.toNumber(),
-      currentBid: listingAccount.currentBid.toNumber(),
-      highestBidder: listingAccount.highestBidder.toBase58(),
-      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
-      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
-      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
-      isActive: listingAccount.isActive,
-      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
-      bump: listingAccount.bump,
-    };
+    //const listingData = {
+    //  mint: listingAccount.mint.toBase58(),
+    //  seller: listingAccount.seller.toBase58(),
+    //  bidCost: listingAccount.bidCost.toNumber(),
+    //  currentBid: listingAccount.currentBid.toNumber(),
+    //  highestBidder: listingAccount.highestBidder.toBase58(),
+    //  timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+    //  startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+    //  endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+    //  isActive: listingAccount.isActive,
+    //  buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+    //  bump: listingAccount.bump,
+    //};
 
     //console.log("Listing Data:", listingData);
 
@@ -546,9 +564,12 @@ describe("nft-marketplace", () => {
         anchor.utils.bytes.utf8.encode("listing"),
         marketplace.toBuffer(),
         pNft.mint.toBuffer(),
+        seedPnftListing.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
     );
+
+    console.log("[List pNFT][listing]:", listing.toBase58());
 
     const escrow = getAssociatedTokenAddressSync(pNft.mint, listing, true);
     const currentSlot = await provider.connection.getSlot();
@@ -565,6 +586,7 @@ describe("nft-marketplace", () => {
       initialDuration: new anchor.BN(initialDurationInSlots), // 24 slots ~ 10 seconds
       buyoutPrice: new anchor.BN(price),
       amount: new anchor.BN(1),
+      seed: seedPnftListing,
     };
 
     const metadata = findMetadataPda(umi, {
@@ -652,6 +674,7 @@ describe("nft-marketplace", () => {
         });
       let tx = await program.methods
         .list(
+          listingConfig.seed,
           listingConfig.bidIncrement,
           listingConfig.timerExtension,
           listingConfig.startTimestamp,
@@ -672,19 +695,19 @@ describe("nft-marketplace", () => {
 
     const listingAccount = await program.account.listing.fetch(listing);
 
-    const listingData = {
-      mint: listingAccount.mint.toBase58(),
-      seller: listingAccount.seller.toBase58(),
-      bidCost: listingAccount.bidCost.toNumber(),
-      currentBid: listingAccount.currentBid.toNumber(),
-      highestBidder: listingAccount.highestBidder.toBase58(),
-      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
-      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
-      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
-      isActive: listingAccount.isActive,
-      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
-      bump: listingAccount.bump,
-    };
+    //const listingData = {
+    //  mint: listingAccount.mint.toBase58(),
+    //  seller: listingAccount.seller.toBase58(),
+    //  bidCost: listingAccount.bidCost.toNumber(),
+    //  currentBid: listingAccount.currentBid.toNumber(),
+    //  highestBidder: listingAccount.highestBidder.toBase58(),
+    //  timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+    //  startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+    //  endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+    //  isActive: listingAccount.isActive,
+    //  buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+    //  bump: listingAccount.bump,
+    //};
 
     //console.log("Listing Data:", listingData);
 
@@ -710,6 +733,7 @@ describe("nft-marketplace", () => {
       true
     );
     expect(listingAccount.bump).to.equal(listingBump);
+    expect(listingAccount.seed.eq(seedPnftListing)).eq(true);
 
     // Check seller ATA has been debited
     const sellerAta = await provider.connection.getTokenAccountBalance(
@@ -725,15 +749,17 @@ describe("nft-marketplace", () => {
   });
 
   it("Bid pNFT", async () => {
-    const [listing, _listingBump] =
-      anchor.web3.PublicKey.findProgramAddressSync(
-        [
-          anchor.utils.bytes.utf8.encode("listing"),
-          marketplace.toBuffer(),
-          pNft.mint.toBuffer(),
-        ],
-        program.programId
-      );
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        pNft.mint.toBuffer(),
+        seedPnftListing.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    console.log("[Bid pNFT][listing]:", listing.toBase58());
 
     let listingAccount = await program.account.listing.fetch(listing);
 
@@ -788,30 +814,31 @@ describe("nft-marketplace", () => {
   it("Delist / End auction pNFT", async () => {
     const expectedTreasuryBalance = 4230000;
     const amount = 1;
-    const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         anchor.utils.bytes.utf8.encode("listing"),
         marketplace.toBuffer(),
         pNft.mint.toBuffer(),
+        seedPnftListing.toArrayLike(Buffer, "le", 8),
       ],
       program.programId
     );
 
     let listingAccount = await program.account.listing.fetch(listing);
 
-    const _listingData = {
-      mint: listingAccount.mint.toBase58(),
-      seller: listingAccount.seller.toBase58(),
-      bidCost: listingAccount.bidCost.toNumber(),
-      currentBid: listingAccount.currentBid.toNumber(),
-      highestBidder: listingAccount.highestBidder.toBase58(),
-      timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
-      startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
-      endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
-      isActive: listingAccount.isActive,
-      buyoutPrice: listingAccount.buyoutPrice.toNumber(),
-      bump: listingAccount.bump,
-    };
+    //const _listingData = {
+    //  mint: listingAccount.mint.toBase58(),
+    //  seller: listingAccount.seller.toBase58(),
+    //  bidCost: listingAccount.bidCost.toNumber(),
+    //  currentBid: listingAccount.currentBid.toNumber(),
+    //  highestBidder: listingAccount.highestBidder.toBase58(),
+    //  timerExtensionInSlots: listingAccount.timerExtensionInSlots.toNumber(),
+    //  startTimeInSlots: listingAccount.startTimeInSlots.toNumber(),
+    //  endTimeInSlots: listingAccount.endTimeInSlots.toNumber(),
+    //  isActive: listingAccount.isActive,
+    //  buyoutPrice: listingAccount.buyoutPrice.toNumber(),
+    //  bump: listingAccount.bump,
+    //};
 
     //console.log("Listing Data:", listingData);
 

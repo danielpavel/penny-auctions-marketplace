@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use solana_program::system_instruction;
 use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::Metadata,
@@ -8,6 +7,7 @@ use anchor_spl::{
         close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TransferChecked,
     },
 };
+use solana_program::system_instruction;
 
 use crate::state::{Listing, Marketplace};
 
@@ -16,9 +16,7 @@ pub struct Purchase<'info> {
     #[account(mut)]
     buyer: Signer<'info>,
 
-    #[account(
-        mut,
-    )]
+    #[account(mut)]
     /// CHECK: I dunno why Anchor is complaining about this one.
     /// I added the address field to the account attribute.
     seller: SystemAccount<'info>,
@@ -48,7 +46,7 @@ pub struct Purchase<'info> {
         close = seller,
         has_one = seller,
         has_one = mint,
-        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref()],
+        seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
     listing: Box<Account<'info, Listing>>,
@@ -82,34 +80,44 @@ pub struct Purchase<'info> {
 
 impl<'info> Purchase<'info> {
     pub fn purchase(&mut self) -> Result<()> {
-
-        let amount_to_treasury = self.listing.buyout_price
-            .checked_mul(self.marketplace.fee as u64).ok_or(ProgramError::ArithmeticOverflow)?
-            .checked_div(10000).ok_or(ProgramError::ArithmeticOverflow)?;
+        let amount_to_treasury = self
+            .listing
+            .buyout_price
+            .checked_mul(self.marketplace.fee as u64)
+            .ok_or(ProgramError::ArithmeticOverflow)?
+            .checked_div(10000)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
         // Transfer the amount to the treasury.
         self.transfer_sol(
-            &self.buyer.to_account_info(), 
-            &self.treasury.to_account_info(), 
-            amount_to_treasury
+            &self.buyer.to_account_info(),
+            &self.treasury.to_account_info(),
+            amount_to_treasury,
         )?;
 
-        let amount_to_maker = self.listing.buyout_price
+        let amount_to_maker = self
+            .listing
+            .buyout_price
             .checked_sub(amount_to_treasury)
             .ok_or(ProgramError::ArithmeticOverflow)?;
 
         // Transfer the remaining amount to the seller.
         self.transfer_sol(
-            &self.buyer.to_account_info(), 
-            &self.seller.to_account_info(), 
-            amount_to_maker
+            &self.buyer.to_account_info(),
+            &self.seller.to_account_info(),
+            amount_to_maker,
         )?;
 
         // Transfer the NFT to the buyer and close vault and listing account.
         self.withdraw_nft_and_close()
     }
 
-    fn transfer_sol(& self, from: &AccountInfo<'info>, to: &AccountInfo<'info>, amount: u64) -> Result<()> {
+    fn transfer_sol(
+        &self,
+        from: &AccountInfo<'info>,
+        to: &AccountInfo<'info>,
+        amount: u64,
+    ) -> Result<()> {
         // Create the transfer instruction
         let transfer_instruction = system_instruction::transfer(from.key, to.key, amount);
 
@@ -132,7 +140,7 @@ impl<'info> Purchase<'info> {
             b"listing",
             self.marketplace.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
-            &bump
+            &bump,
         ][..]];
 
         let accounts = TransferChecked {

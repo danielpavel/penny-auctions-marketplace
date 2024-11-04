@@ -39,7 +39,7 @@ pub struct Delist<'info> {
     #[account(
         mut,
         close = maker,
-        seeds = [b"listing", marketplace.key().as_ref(), maker_mint.key().as_ref()],
+        seeds = [b"listing", marketplace.key().as_ref(), maker_mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
     pub listing: Box<Account<'info, Listing>>,

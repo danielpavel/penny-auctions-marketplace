@@ -23,6 +23,7 @@ pub mod nft_marketplace {
     pub fn list<'info>(
         //ctx: Context<List>,
         ctx: Context<'_, '_, '_, 'info, List<'info>>,
+        seed: u64,
         bid_increment: u64,
         timer_extension_in_slots: u64,
         start_time_in_slots: u64,
@@ -31,6 +32,7 @@ pub mod nft_marketplace {
         amount: u64,
     ) -> Result<()> {
         ctx.accounts.create_listing(
+            seed,
             bid_increment,
             timer_extension_in_slots,
             start_time_in_slots,

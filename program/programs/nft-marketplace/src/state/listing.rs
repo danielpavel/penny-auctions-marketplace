@@ -14,5 +14,6 @@ pub struct Listing {
     pub end_time_in_slots: u64,
     pub is_active: bool,
     pub buyout_price: u64,
+    pub seed: u64,
     pub bump: u8,
 }

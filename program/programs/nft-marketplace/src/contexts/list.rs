@@ -20,6 +20,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
+#[instruction(seed: u64)]
 pub struct List<'info> {
     #[account(mut)]
     seller: Signer<'info>,
@@ -28,7 +29,7 @@ pub struct List<'info> {
         init,
         payer = seller,
         space = 8 + Listing::INIT_SPACE,
-        seeds = [b"listing", marketplace.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"listing", marketplace.key().as_ref(), mint.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump
     )]
     listing: Box<Account<'info, Listing>>,
@@ -85,6 +86,7 @@ pub struct List<'info> {
 impl<'info> List<'info> {
     pub fn create_listing(
         &mut self,
+        seed: u64,
         bid_increment: u64,
         timer_extension_in_slots: u64,
         start_time_in_slots: u64,
@@ -108,6 +110,7 @@ impl<'info> List<'info> {
             end_time_in_slots,
             is_active: true,
             buyout_price,
+            seed,
             bump: bumps.listing,
         });
 

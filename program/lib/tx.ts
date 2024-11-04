@@ -1,4 +1,4 @@
-import { Program, utils, web3 } from "@coral-xyz/anchor";
+import { Program, utils, web3, BN } from "@coral-xyz/anchor";
 import {
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
@@ -199,7 +199,7 @@ export const createEndAuctionTx = async (
   };
 
   const tx = new web3.Transaction().add(
-    await program.methods.endListing().accounts(accounts).instruction()
+    await program.methods.endListing(new BN(1)).accounts(accounts).instruction()
   );
 
   tx.feePayer = user;
