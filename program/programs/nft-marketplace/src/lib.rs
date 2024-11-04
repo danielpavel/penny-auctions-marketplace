@@ -61,8 +61,12 @@ pub mod nft_marketplace {
         ctx.accounts.purchase()
     }
 
-    pub fn place_bid(ctx: Context<PlaceBid>) -> Result<()> {
-        ctx.accounts.place_bid()
+    pub fn place_bid(
+        ctx: Context<PlaceBid>,
+        highest_bidder: Pubkey,
+        current_bid: u64,
+    ) -> Result<()> {
+        ctx.accounts.place_bid(&highest_bidder, &current_bid)
     }
 
     pub fn end_listing<'info>(

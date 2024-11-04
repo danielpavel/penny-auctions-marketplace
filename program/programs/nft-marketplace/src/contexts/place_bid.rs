@@ -9,7 +9,10 @@ use crate::{
     constants::BID_PLACED_LABEL,
     events::BidPlaced,
     state::{Listing, Marketplace},
-    utils::{assert_auction_active, MarketplaceErrorCode},
+    utils::{
+        assert_already_highest_bidder, assert_auction_active,
+        assert_correct_highest_bidder_and_bid, MarketplaceErrorCode,
+    },
 };
 
 #[derive(Accounts)]
@@ -62,8 +65,10 @@ pub struct PlaceBid<'info> {
 }
 
 impl<'info> PlaceBid<'info> {
-    pub fn place_bid(&mut self) -> Result<()> {
+    pub fn place_bid(&mut self, current_highest_bidder: &Pubkey, current_bid: &u64) -> Result<()> {
         assert_auction_active(&self.listing)?;
+        assert_correct_highest_bidder_and_bid(&self.listing, current_highest_bidder, current_bid)?;
+        assert_already_highest_bidder(&self.listing, &self.bidder.to_account_info().key())?;
 
         require!(
             self.listing.highest_bidder.key() != self.bidder.key(),

@@ -25,6 +25,7 @@ import {
   toWeb3JsPublicKey,
 } from "@metaplex-foundation/umi-web3js-adapters";
 import { generateRandomU64Seed } from "./utils/utils";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 
 const confirmOpts: anchor.web3.ConfirmOptions = {
   preflightCommitment: "confirmed",
@@ -357,7 +358,7 @@ describe("nft-marketplace", () => {
     expect(escrowAccount.value.amount).to.equal("1");
   });
 
-  it("Bid", async () => {
+  it("User 2 Bid", async () => {
     const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
       [
         anchor.utils.bytes.utf8.encode("listing"),
@@ -368,13 +369,14 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    console.log("[Bid][listing] ", listing.toBase58());
-
     let listingAccount = await program.account.listing.fetch(listing);
 
     let oldEndTimeInSlots = listingAccount.endTimeInSlots.toNumber();
     let bidIncrement = listingAccount.bidIncrement.toNumber();
     let timerExtensionInSlots = listingAccount.timerExtensionInSlots.toNumber();
+
+    let highestBidder = listingAccount.highestBidder;
+    let currentBid = listingAccount.currentBid;
 
     let accounts = {
       bidder: user2.publicKey,
@@ -389,7 +391,7 @@ describe("nft-marketplace", () => {
 
     try {
       let tx = await program.methods
-        .placeBid()
+        .placeBid(highestBidder, currentBid)
         .accounts(accounts)
         .signers([user2])
         .rpc();
@@ -460,6 +462,79 @@ describe("nft-marketplace", () => {
       */
     } catch (error) {
       console.error(error);
+    }
+  });
+
+  it("User 2 bids again - should fail.", async () => {
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        nft.mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    let listingAccount = await program.account.listing.fetch(listing);
+
+    let accounts = {
+      bidder: user2.publicKey,
+      bidderAta: user2BidTokenATA,
+      mint: nft.mint,
+      listing,
+      marketplace,
+      bidsMint: bidTokenMint,
+      bidsVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    };
+
+    try {
+      await program.methods
+        .placeBid(listingAccount.highestBidder, listingAccount.currentBid)
+        .accounts(accounts)
+        .signers([user2])
+        .rpc();
+    } catch (error) {
+      const errMsg = "Incomming bidder is already the highest bidder";
+      expect(error.error.errorMessage).to.eq(errMsg);
+    }
+  });
+
+  it("User 1 bid with wrong Highest Bidder and Current Bid values should fail.", async () => {
+    const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        nft.mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    let highestBidder = PublicKey.unique();
+    let currentBid = new anchor.BN(0.1 * LAMPORTS_PER_SOL);
+
+    let accounts = {
+      bidder: user1.publicKey,
+      bidderAta: user1BidTokenATA,
+      mint: nft.mint,
+      listing,
+      marketplace,
+      bidsMint: bidTokenMint,
+      bidsVault,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    };
+
+    try {
+      await program.methods
+        .placeBid(highestBidder, currentBid)
+        .accounts(accounts)
+        .signers([user1])
+        .rpc();
+    } catch (error) {
+      const errMsg = "Invalid current highest bidder and price";
+      expect(error.error.errorMessage).to.eq(errMsg);
     }
   });
 
@@ -780,7 +855,7 @@ describe("nft-marketplace", () => {
 
     try {
       let tx = await program.methods
-        .placeBid()
+        .placeBid(listingAccount.highestBidder, listingAccount.currentBid)
         .accounts(accounts)
         .signers([user2])
         .rpc();

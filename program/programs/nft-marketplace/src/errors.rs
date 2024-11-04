@@ -8,7 +8,7 @@ pub enum MarketplaceErrorCode {
     ClaimerIsNotHighestBidder,
     #[msg("Only the listing seller can claim this auction")]
     ClaimerIsNotSeller,
-    #[msg("You are already the highest bidder")]
+    #[msg("Incomming bidder is already the highest bidder")]
     BidderIsHighestBidder,
     #[msg("The auction is not active")]
     AuctionNotActive,
@@ -29,4 +29,7 @@ pub enum MarketplaceErrorCode {
     // Copied from mpl_token_metadata
     #[msg("Invalid metadata program")]
     InvalidMetadataProgram,
+
+    #[msg("Invalid current highest bidder and price")]
+    InvalidCurrentHighestBidderAndPrice,
 }

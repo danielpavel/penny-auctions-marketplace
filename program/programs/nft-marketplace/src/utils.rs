@@ -5,6 +5,31 @@ use solana_program::{program::invoke, system_instruction};
 pub use crate::errors::MarketplaceErrorCode;
 use crate::state::Listing;
 
+pub fn assert_correct_highest_bidder_and_bid(
+    listing: &Account<Listing>,
+    current_highest_bidder: &Pubkey,
+    current_bid: &u64,
+) -> Result<()> {
+    if listing.highest_bidder.key() != current_highest_bidder.key()
+        || listing.current_bid.ne(current_bid)
+    {
+        return err!(MarketplaceErrorCode::InvalidCurrentHighestBidderAndPrice);
+    }
+
+    Ok(())
+}
+
+pub fn assert_already_highest_bidder(
+    listing: &Account<Listing>,
+    incomming_highest_bidder: &Pubkey,
+) -> Result<()> {
+    if listing.highest_bidder.key() == incomming_highest_bidder.key() {
+        return err!(MarketplaceErrorCode::BidderIsHighestBidder);
+    }
+
+    Ok(())
+}
+
 pub fn assert_auction_active(listing: &Account<Listing>) -> Result<()> {
     let current_slot = Clock::get()?.slot;
 

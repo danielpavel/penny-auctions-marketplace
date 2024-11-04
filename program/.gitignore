@@ -7,3 +7,6 @@ wallets/
 node_modules
 test-ledger
 .yarn
+
+# Redis' disk snapshot dump
+dump.rdb
