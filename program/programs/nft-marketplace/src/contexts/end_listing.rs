@@ -20,6 +20,11 @@ pub struct EndListing<'info> {
     user: Signer<'info>,
 
     #[account(
+        address = marketplace.admin @ MarketplaceErrorCode::InvalidListingAuthority
+    )]
+    admin: Signer<'info>,
+
+    #[account(
         mut,
         address = listing.seller
     )]

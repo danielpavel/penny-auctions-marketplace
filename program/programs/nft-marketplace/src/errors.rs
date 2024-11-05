@@ -32,4 +32,7 @@ pub enum MarketplaceErrorCode {
 
     #[msg("Invalid current highest bidder and price")]
     InvalidCurrentHighestBidderAndPrice,
+
+    #[msg("Invalid authority! Only marketplace admin can create / end a listing")]
+    InvalidListingAuthority,
 }

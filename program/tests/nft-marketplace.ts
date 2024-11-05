@@ -275,6 +275,7 @@ describe("nft-marketplace", () => {
 
     let accounts = {
       seller: user1.publicKey,
+      admin: initializer.publicKey,
       listing,
       marketplace,
       mint: nft.mint,
@@ -297,7 +298,7 @@ describe("nft-marketplace", () => {
           listingConfig.amount
         )
         .accounts(accounts)
-        .signers([user1])
+        .signers([user1, initializer])
         .rpc();
 
       console.log("Your transaction signature", tx);
@@ -584,6 +585,7 @@ describe("nft-marketplace", () => {
 
     let accounts = {
       user: user2.publicKey,
+      admin: initializer.publicKey,
       seller: user1.publicKey,
       userAta: user2NftAta,
       mint: nft.mint,
@@ -601,7 +603,7 @@ describe("nft-marketplace", () => {
       let tx = await program.methods
         .endListing(new anchor.BN(amount))
         .accounts(accounts)
-        .signers([user2])
+        .signers([user2, initializer])
         .rpc();
 
       console.log("Your transaction signature", tx);
@@ -677,6 +679,7 @@ describe("nft-marketplace", () => {
     const sysvarInstructions = anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY;
     let accounts = {
       seller: initializer.publicKey,
+      admin: initializer.publicKey,
       listing,
       marketplace,
       mint: pNft.mint,
@@ -760,7 +763,7 @@ describe("nft-marketplace", () => {
         .accounts(accounts)
         .preInstructions([computeUnitLimitTx])
         .remainingAccounts(remainingAccounts)
-        .signers([initializer])
+        .signers([initializer, initializer])
         .rpc();
 
       console.log("Your transaction signature", tx);
@@ -925,6 +928,7 @@ describe("nft-marketplace", () => {
 
     let accounts = {
       user: user2.publicKey,
+      admin: initializer.publicKey,
       seller: initializer.publicKey,
       userAta: userAta,
       mint: pNft.mint,
@@ -1009,7 +1013,7 @@ describe("nft-marketplace", () => {
         .accounts(accounts)
         .preInstructions([computeUnitLimitTx])
         .remainingAccounts(remainingAccounts)
-        .signers([user2])
+        .signers([user2, initializer])
         .rpc();
 
       console.log("Your transaction signature", tx);
@@ -1039,6 +1043,8 @@ describe("nft-marketplace", () => {
     expect(treasuryBalance).to.equal(expectedTreasuryBalance);
   });
 
+  /* NOTE: Disabled!
+   *
   it("initialize user", async () => {
     const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
       [anchor.utils.bytes.utf8.encode("user"), user1.publicKey.toBuffer()],
@@ -1069,6 +1075,7 @@ describe("nft-marketplace", () => {
     expect(userAccount.points).to.equal(0);
     expect(userAccount.bump).to.equal(bump);
   });
+  */
 });
 
 // Helpers

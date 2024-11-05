@@ -49,6 +49,8 @@ pub mod nft_marketplace {
         Ok(())
     }
 
+    /* NOTE: currently disabled!
+     *
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
         ctx.accounts.initialize_user(&ctx.bumps)
     }
@@ -60,6 +62,7 @@ pub mod nft_marketplace {
     pub fn purchase(ctx: Context<Purchase>) -> Result<()> {
         ctx.accounts.purchase()
     }
+    */
 
     pub fn place_bid(
         ctx: Context<PlaceBid>,

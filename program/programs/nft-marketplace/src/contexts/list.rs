@@ -26,6 +26,11 @@ pub struct List<'info> {
     seller: Signer<'info>,
 
     #[account(
+        address = marketplace.admin @ MarketplaceErrorCode::InvalidListingAuthority
+    )]
+    admin: Signer<'info>,
+
+    #[account(
         init,
         payer = seller,
         space = 8 + Listing::INIT_SPACE,
