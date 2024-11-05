@@ -1,3 +1,6 @@
 [submodule "indexer"]
 	path = indexer
 	url = https://github.com/danielpavel/nftsforless-indexer.git
+[submodule "backend"]
+	path = backend
+  url = https://github.com:danielpavel/sandcastle-backend.git
