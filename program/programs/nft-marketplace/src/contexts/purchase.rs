@@ -9,7 +9,7 @@ use anchor_spl::{
 };
 use solana_program::system_instruction;
 
-use crate::state::{Listing, Marketplace};
+use crate::state::{ListingV2, Marketplace};
 
 #[derive(Accounts)]
 pub struct Purchase<'info> {
@@ -49,7 +49,7 @@ pub struct Purchase<'info> {
         seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
-    listing: Box<Account<'info, Listing>>,
+    listing: Box<Account<'info, ListingV2>>,
 
     #[account(
         mut,

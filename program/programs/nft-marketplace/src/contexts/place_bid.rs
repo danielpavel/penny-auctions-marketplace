@@ -8,7 +8,7 @@ use anchor_spl::{
 use crate::{
     constants::BID_PLACED_LABEL,
     events::BidPlaced,
-    state::{Listing, Marketplace},
+    state::{ListingV2, Marketplace},
     utils::{
         assert_already_highest_bidder, assert_auction_active,
         assert_correct_highest_bidder_and_bid, MarketplaceErrorCode,
@@ -38,7 +38,7 @@ pub struct PlaceBid<'info> {
         seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
-    listing: Box<Account<'info, Listing>>,
+    listing: Box<Account<'info, ListingV2>>,
 
     #[account(
         mut,

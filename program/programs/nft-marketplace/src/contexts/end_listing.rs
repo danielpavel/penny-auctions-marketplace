@@ -9,7 +9,7 @@ use anchor_spl::{
 use crate::{
     constants::LISTING_ENDED_LABEL,
     events::ListingEnded,
-    state::{Listing, Marketplace},
+    state::{ListingV2, Marketplace},
     transfer::transfer_asset,
     utils::{assert_allowed_claimer, assert_auction_ended, transfer_sol, MarketplaceErrorCode},
 };
@@ -51,7 +51,7 @@ pub struct EndListing<'info> {
         seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
     )]
-    listing: Box<Account<'info, Listing>>,
+    listing: Box<Account<'info, ListingV2>>,
 
     #[account(
         mut,

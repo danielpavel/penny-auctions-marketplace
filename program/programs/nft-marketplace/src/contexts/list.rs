@@ -14,7 +14,7 @@ use anchor_spl::{
 use crate::{
     constants::LISTING_CREATED_LABEL,
     events::ListingCreated,
-    state::{Listing, Marketplace},
+    state::{ListingV2, Marketplace},
     transfer::transfer_asset,
     utils::MarketplaceErrorCode,
 };
@@ -33,11 +33,11 @@ pub struct List<'info> {
     #[account(
         init,
         payer = seller,
-        space = 8 + Listing::INIT_SPACE,
+        space = 8 + ListingV2::INIT_SPACE,
         seeds = [b"listing", marketplace.key().as_ref(), mint.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump
     )]
-    listing: Box<Account<'info, Listing>>,
+    listing: Box<Account<'info, ListingV2>>,
 
     #[account(
         mut,
@@ -103,7 +103,7 @@ impl<'info> List<'info> {
             .checked_add(initial_duration_in_slots)
             .ok_or(ProgramError::ArithmeticOverflow)?;
 
-        self.listing.set_inner(Listing {
+        self.listing.set_inner(ListingV2 {
             mint: self.mint.key(),
             seller: self.seller.key(),
             bid_cost: 1,

@@ -3,10 +3,10 @@ use anchor_lang::prelude::*;
 use solana_program::{program::invoke, system_instruction};
 
 pub use crate::errors::MarketplaceErrorCode;
-use crate::state::Listing;
+use crate::state::ListingV2;
 
 pub fn assert_correct_highest_bidder_and_bid(
-    listing: &Account<Listing>,
+    listing: &Account<ListingV2>,
     current_highest_bidder: &Pubkey,
     current_bid: &u64,
 ) -> Result<()> {
@@ -20,7 +20,7 @@ pub fn assert_correct_highest_bidder_and_bid(
 }
 
 pub fn assert_already_highest_bidder(
-    listing: &Account<Listing>,
+    listing: &Account<ListingV2>,
     incomming_highest_bidder: &Pubkey,
 ) -> Result<()> {
     if listing.highest_bidder.key() == incomming_highest_bidder.key() {
@@ -30,7 +30,7 @@ pub fn assert_already_highest_bidder(
     Ok(())
 }
 
-pub fn assert_auction_active(listing: &Account<Listing>) -> Result<()> {
+pub fn assert_auction_active(listing: &Account<ListingV2>) -> Result<()> {
     let current_slot = Clock::get()?.slot;
 
     if !listing.is_active {
@@ -44,7 +44,7 @@ pub fn assert_auction_active(listing: &Account<Listing>) -> Result<()> {
     Ok(())
 }
 
-pub fn assert_auction_ended(listing: &Account<Listing>) -> Result<()> {
+pub fn assert_auction_ended(listing: &Account<ListingV2>) -> Result<()> {
     let current_slot = Clock::get()?.slot;
 
     if current_slot < listing.end_time_in_slots {
@@ -54,7 +54,7 @@ pub fn assert_auction_ended(listing: &Account<Listing>) -> Result<()> {
     Ok(())
 }
 
-pub fn assert_allowed_claimer(listing: &Account<Listing>, bidder: &AccountInfo) -> Result<()> {
+pub fn assert_allowed_claimer(listing: &Account<ListingV2>, bidder: &AccountInfo) -> Result<()> {
     if listing.highest_bidder.key() == Pubkey::default() {
         if listing.seller.key() != bidder.key() {
             return err!(MarketplaceErrorCode::ClaimerIsNotSeller);
@@ -66,7 +66,7 @@ pub fn assert_allowed_claimer(listing: &Account<Listing>, bidder: &AccountInfo) 
     Ok(())
 }
 
-pub fn assert_auction_delist_eligible(listing: &Account<Listing>) -> Result<()> {
+pub fn assert_auction_delist_eligible(listing: &Account<ListingV2>) -> Result<()> {
     if listing.highest_bidder.key() != Pubkey::default() {
         return err!(MarketplaceErrorCode::CannotDelistWithActiveBidder);
     }

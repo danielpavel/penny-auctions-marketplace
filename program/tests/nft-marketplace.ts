@@ -306,7 +306,7 @@ describe("nft-marketplace", () => {
       console.error(error);
     }
 
-    const listingAccount = await program.account.listing.fetch(listing);
+    const listingAccount = await program.account.listingV2.fetch(listing);
 
     //const listingData = {
     //  mint: listingAccount.mint.toBase58(),
@@ -370,7 +370,7 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    let listingAccount = await program.account.listing.fetch(listing);
+    let listingAccount = await program.account.listingV2.fetch(listing);
 
     let oldEndTimeInSlots = listingAccount.endTimeInSlots.toNumber();
     let bidIncrement = listingAccount.bidIncrement.toNumber();
@@ -397,7 +397,7 @@ describe("nft-marketplace", () => {
         .signers([user2])
         .rpc();
 
-      listingAccount = await program.account.listing.fetch(listing);
+      listingAccount = await program.account.listingV2.fetch(listing);
 
       expect(listingAccount.currentBid.toNumber()).to.equal(bidIncrement);
       expect(listingAccount.highestBidder).to.deep.equal(user2.publicKey);
@@ -477,7 +477,7 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    let listingAccount = await program.account.listing.fetch(listing);
+    let listingAccount = await program.account.listingV2.fetch(listing);
 
     let accounts = {
       bidder: user2.publicKey,
@@ -553,7 +553,7 @@ describe("nft-marketplace", () => {
 
     console.log("[End][listing] ", listing.toBase58());
 
-    let listingAccount = await program.account.listing.fetch(listing);
+    let listingAccount = await program.account.listingV2.fetch(listing);
 
     //const listingData = {
     //  mint: listingAccount.mint.toBase58(),
@@ -611,7 +611,7 @@ describe("nft-marketplace", () => {
       console.error(err);
     }
 
-    listingAccount = await program.account.listing.fetch(listing);
+    listingAccount = await program.account.listingV2.fetch(listing);
     expect(listingAccount.isActive).to.eq(false);
 
     try {
@@ -771,7 +771,7 @@ describe("nft-marketplace", () => {
       console.error(error);
     }
 
-    const listingAccount = await program.account.listing.fetch(listing);
+    const listingAccount = await program.account.listingV2.fetch(listing);
 
     //const listingData = {
     //  mint: listingAccount.mint.toBase58(),
@@ -839,7 +839,7 @@ describe("nft-marketplace", () => {
 
     console.log("[Bid pNFT][listing]:", listing.toBase58());
 
-    let listingAccount = await program.account.listing.fetch(listing);
+    let listingAccount = await program.account.listingV2.fetch(listing);
 
     let oldEndTimeInSlots = listingAccount.endTimeInSlots.toNumber();
     let bidIncrement = listingAccount.bidIncrement.toNumber();
@@ -863,7 +863,7 @@ describe("nft-marketplace", () => {
         .signers([user2])
         .rpc();
 
-      listingAccount = await program.account.listing.fetch(listing);
+      listingAccount = await program.account.listingV2.fetch(listing);
 
       expect(listingAccount.currentBid.toNumber()).to.equal(bidIncrement);
       expect(listingAccount.highestBidder).to.deep.equal(user2.publicKey);
@@ -902,7 +902,7 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    let listingAccount = await program.account.listing.fetch(listing);
+    let listingAccount = await program.account.listingV2.fetch(listing);
 
     //const _listingData = {
     //  mint: listingAccount.mint.toBase58(),
@@ -1021,7 +1021,7 @@ describe("nft-marketplace", () => {
       console.error(error);
     }
 
-    listingAccount = await program.account.listing.fetch(listing);
+    listingAccount = await program.account.listingV2.fetch(listing);
     expect(listingAccount.isActive).to.eq(false);
 
     try {
