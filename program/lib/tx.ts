@@ -21,19 +21,19 @@ export const createInitializeMarketplaceTx = async (
   program: Program<NftMarketplace>,
   bidTokenMint: PublicKey
 ) => {
-  const [marketplace, _marketplaceBump] = PublicKey.findProgramAddressSync(
+  const [marketplace] = PublicKey.findProgramAddressSync(
     [utils.bytes.utf8.encode(MARKETPLACE_SEED), utils.bytes.utf8.encode(name)],
     program.programId
   );
   console.log("Marketplace: ", marketplace.toBase58());
 
-  const [rewardsMint, _rewardsBump] = PublicKey.findProgramAddressSync(
+  const [rewardsMint] = PublicKey.findProgramAddressSync(
     [utils.bytes.utf8.encode(REWARDS_SEED), marketplace.toBuffer()],
     program.programId
   );
   console.log("Rewards Mint: ", rewardsMint.toBase58());
 
-  const [treasury, _treasuryBump] = PublicKey.findProgramAddressSync(
+  const [treasury] = PublicKey.findProgramAddressSync(
     [utils.bytes.utf8.encode(TREASURY_SEED), marketplace.toBuffer()],
     program.programId
   );
@@ -67,142 +67,132 @@ export const createInitializeMarketplaceTx = async (
   return { tx, marketplace };
 };
 
-export const createListTx = async (
-  seller: PublicKey,
-  sellerAta: PublicKey,
-  marketplace: PublicKey,
-  nftMint: PublicKey,
-  nftCollection: PublicKey,
-  program: Program<NftMarketplace>,
-  listingConfig: any
-) => {
-  const [listing, _listingBump] = PublicKey.findProgramAddressSync(
-    [
-      utils.bytes.utf8.encode(LISTING_SEED),
-      marketplace.toBuffer(),
-      nftMint.toBuffer(),
-    ],
-    program.programId
-  );
-
-  console.log("Listing: ", listing.toBase58());
-
-  const escrow = getAssociatedTokenAddressSync(nftMint, listing, true);
-
-  let accounts = {
-    seller,
-    listing,
-    marketplace,
-    mint: nftMint,
-    collection: nftCollection,
-    sellerAta,
-    escrow,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    sysvarInstructions: SYSVAR_INSTRUCTIONS_PUBKEY,
-  };
-
-  const tx = new web3.Transaction();
-
-  tx.add(
-    await program.methods
-      .list(
-        listingConfig.bidIncrement,
-        listingConfig.timerExtensionInSlots,
-        listingConfig.startTimeInSlots,
-        listingConfig.initialDurationInSlots,
-        listingConfig.buyoutPrice,
-        listingConfig.amount
-      )
-      .accounts(accounts)
-      .instruction()
-  );
-
-  tx.feePayer = seller;
-
-  return tx;
-};
-
-export const createPlaceBidTx = async (
-  bidder: PublicKey,
-  marketplace: PublicKey,
-  nftMint: PublicKey,
-  bidTokenMint: PublicKey,
-  program: Program<NftMarketplace>
-) => {
-  const [listing, _listingBump] = PublicKey.findProgramAddressSync(
-    [
-      utils.bytes.utf8.encode(LISTING_SEED),
-      marketplace.toBuffer(),
-      nftMint.toBuffer(),
-    ],
-    program.programId
-  );
-
-  //console.log("[createPlaceBidTx] Listing: ", listing.toBase58());
-  //console.log("[createPlaceBidTx] nftMint: ", nftMint.toBase58());
-  //console.log("[createPlaceBidTx] bidTokenMint: ", bidTokenMint.toBase58());
-
-  const bidderBidTokenATA = getAssociatedTokenAddressSync(bidTokenMint, bidder);
-  const bidsVault = getAssociatedTokenAddressSync(
-    bidTokenMint,
-    marketplace,
-    true
-  );
-
-  let accounts = {
-    bidder,
-    bidderAta: bidderBidTokenATA,
-    mint: nftMint,
-    listing,
-    marketplace,
-    bidsMint: bidTokenMint,
-    bidsVault,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  };
-
-  console.log(
-    "Place bid tx with accounts:",
-    Object.values(accounts).map((a) => a.toBase58())
-  );
-
-  const tx = new web3.Transaction();
-
-  tx.add(await program.methods.placeBid().accounts(accounts).instruction());
-
-  tx.feePayer = bidder;
-
-  return tx;
-};
-
-export const createEndAuctionTx = async (
-  user: PublicKey,
-  seller: PublicKey,
-  listing: PublicKey,
-  marketplace: PublicKey,
-  nftMint: PublicKey,
-  program: Program<NftMarketplace>,
-  bidTokenMint: PublicKey
-) => {
-  const userAta = getAssociatedTokenAddressSync(nftMint, user);
-  const escrow = getAssociatedTokenAddressSync(nftMint, listing, true);
-
-  let accounts = {
-    user,
-    seller,
-    userAta,
-    mint: nftMint,
-    listing,
-    marketplace,
-    bidsMint: bidTokenMint,
-    escrow,
-    tokenProgram: TOKEN_PROGRAM_ID,
-  };
-
-  const tx = new web3.Transaction().add(
-    await program.methods.endListing(new BN(1)).accounts(accounts).instruction()
-  );
-
-  tx.feePayer = user;
-
-  return tx;
-};
+// export const createListTx = async (
+//   seller: PublicKey,
+//   sellerAta: PublicKey,
+//   marketplace: PublicKey,
+//   nftMint: PublicKey,
+//   nftCollection: PublicKey,
+//   program: Program<NftMarketplace>,
+//   listingConfig: any
+// ) => {
+//   const [listing, _listingBump] = PublicKey.findProgramAddressSync(
+//     [
+//       utils.bytes.utf8.encode(LISTING_SEED),
+//       marketplace.toBuffer(),
+//       nftMint.toBuffer(),
+//     ],
+//     program.programId
+//   );
+//
+//   console.log("Listing: ", listing.toBase58());
+//
+//   const escrow = getAssociatedTokenAddressSync(nftMint, listing, true);
+//
+//   let accounts = {
+//     seller,
+//     listing,
+//     marketplace,
+//     mint: nftMint,
+//     collection: nftCollection,
+//     sellerAta,
+//     escrow,
+//     tokenProgram: TOKEN_PROGRAM_ID,
+//     sysvarInstructions: SYSVAR_INSTRUCTIONS_PUBKEY,
+//   };
+//
+//   const tx = new web3.Transaction();
+//
+//   tx.add(
+//     await program.methods
+//       .list(
+//         listingConfig.bidIncrement,
+//         listingConfig.timerExtensionInSlots,
+//         listingConfig.startTimeInSlots,
+//         listingConfig.initialDurationInSlots,
+//         listingConfig.buyoutPrice,
+//         listingConfig.amount
+//       )
+//       .accounts(accounts)
+//       .instruction()
+//   );
+//
+//   tx.feePayer = seller;
+//
+//   return tx;
+// };
+//
+// export const createPlaceBidTx = async (
+//   listing: PublicKey,
+//   bidder: PublicKey,
+//   highestBidder: PublicKey,
+//   currentBid: BN,
+//   marketplace: PublicKey,
+//   mint: PublicKey,
+//   bidTokenMint: PublicKey,
+//   program: Program<NftMarketplace>
+// ) => {
+//   const bidderBidTokenATA = getAssociatedTokenAddressSync(bidTokenMint, bidder);
+//   const bidsVault = getAssociatedTokenAddressSync(
+//     bidTokenMint,
+//     marketplace,
+//     true
+//   );
+//
+//   let accounts = {
+//     bidder,
+//     bidderAta: bidderBidTokenATA,
+//     mint,
+//     listing,
+//     marketplace,
+//     bidsMint: bidTokenMint,
+//     bidsVault,
+//     tokenProgram: TOKEN_PROGRAM_ID,
+//   };
+//
+//   const tx = new web3.Transaction();
+//
+//   tx.add(
+//     await program.methods
+//       .placeBid(highestBidder, currentBid)
+//       .accounts(accounts)
+//       .instruction()
+//   );
+//
+//   tx.feePayer = bidder;
+//
+//   return tx;
+// };
+//
+// export const createEndAuctionTx = async (
+//   user: PublicKey,
+//   seller: PublicKey,
+//   listing: PublicKey,
+//   marketplace: PublicKey,
+//   nftMint: PublicKey,
+//   program: Program<NftMarketplace>,
+//   bidTokenMint: PublicKey
+// ) => {
+//   const userAta = getAssociatedTokenAddressSync(nftMint, user);
+//   const escrow = getAssociatedTokenAddressSync(nftMint, listing, true);
+//
+//   let accounts = {
+//     user,
+//     seller,
+//     userAta,
+//     mint: nftMint,
+//     listing,
+//     marketplace,
+//     bidsMint: bidTokenMint,
+//     escrow,
+//     tokenProgram: TOKEN_PROGRAM_ID,
+//   };
+//
+//   const tx = new web3.Transaction().add(
+//     await program.methods.endListing(new BN(1)).accounts(accounts).instruction()
+//   );
+//
+//   tx.feePayer = user;
+//
+//   return tx;
+// };

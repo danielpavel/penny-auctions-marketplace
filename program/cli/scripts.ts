@@ -3,7 +3,6 @@ import {
   Program,
   Provider,
   AnchorProvider,
-  BN,
   utils,
   web3,
 } from "@coral-xyz/anchor";
@@ -14,22 +13,14 @@ import { PublicKey, clusterApiUrl } from "@solana/web3.js";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { NftMarketplace } from "../target/types/nft_marketplace";
 
-import {
-  createListTx,
-  createPlaceBidTx,
-  createInitializeMarketplaceTx,
-  createEndAuctionTx,
-} from "../lib/tx";
+import { createInitializeMarketplaceTx } from "../lib/tx";
 import { execTx } from "../lib/util";
 
 import { createCollectionNft, mintNftAndVerify } from "../tests/utils/nft";
 
 import { initUmi } from "../tests/utils/umi";
 import { createBidToken } from "../tests/utils/bidToken";
-import {
-  fromWeb3JsPublicKey,
-  toWeb3JsPublicKey,
-} from "@metaplex-foundation/umi-web3js-adapters";
+import { toWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
 import dotenv from "dotenv";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LISTING_SEED, REWARDS_SEED, TREASURY_SEED } from "../lib/constants";
@@ -183,51 +174,51 @@ export const initProject = async () => {
 /**
  * Create Auction
  */
-export const createAuctionListing = async (
-  buyoutPrice: number,
-  initialDurationInSlots: number,
-  seller: anchor.web3.Keypair,
-  mint: PublicKey,
-  collection: PublicKey
-) => {
-  const timerExtensionInSlots = 12;
-
-  const currentSlot = await provider.connection.getSlot();
-
-  let config = {
-    bidIncrement: new BN(buyoutPrice / 1000),
-    timerExtensionInSlots: new BN(timerExtensionInSlots), // 12 slots ~ 5 seconds
-    startTimeInSlots: new BN(currentSlot),
-    initialDurationInSlots: new BN(initialDurationInSlots),
-    buyoutPrice: new BN(buyoutPrice),
-    amount: new BN(1),
-  };
-
-  console.log("Creating auction with config: ", {
-    bidIncrement: config.bidIncrement.toNumber(),
-    timerExtensionInSlots: config.timerExtensionInSlots.toNumber(),
-    startTimestamp: config.startTimeInSlots.toNumber(),
-    initialDurationInSlots: config.initialDurationInSlots.toNumber(),
-    buyoutPrice: config.buyoutPrice.toNumber(),
-  });
-
-  const sellerWallet = new NodeWallet(seller);
-  const sellerAta = getAssociatedTokenAddressSync(mint, seller.publicKey);
-
-  const tx = await createListTx(
-    seller.publicKey,
-    sellerAta,
-    marketplace,
-    mint,
-    collection,
-    program,
-    config
-  );
-
-  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-  await execTx(tx, connection, sellerWallet);
-};
+// export const createAuctionListing = async (
+//   buyoutPrice: number,
+//   initialDurationInSlots: number,
+//   seller: anchor.web3.Keypair,
+//   mint: PublicKey,
+//   collection: PublicKey
+// ) => {
+//   const timerExtensionInSlots = 12;
+//
+//   const currentSlot = await provider.connection.getSlot();
+//
+//   let config = {
+//     bidIncrement: new BN(buyoutPrice / 1000),
+//     timerExtensionInSlots: new BN(timerExtensionInSlots), // 12 slots ~ 5 seconds
+//     startTimeInSlots: new BN(currentSlot),
+//     initialDurationInSlots: new BN(initialDurationInSlots),
+//     buyoutPrice: new BN(buyoutPrice),
+//     amount: new BN(1),
+//   };
+//
+//   console.log("Creating auction with config: ", {
+//     bidIncrement: config.bidIncrement.toNumber(),
+//     timerExtensionInSlots: config.timerExtensionInSlots.toNumber(),
+//     startTimestamp: config.startTimeInSlots.toNumber(),
+//     initialDurationInSlots: config.initialDurationInSlots.toNumber(),
+//     buyoutPrice: config.buyoutPrice.toNumber(),
+//   });
+//
+//   const sellerWallet = new NodeWallet(seller);
+//   const sellerAta = getAssociatedTokenAddressSync(mint, seller.publicKey);
+//
+//   const tx = await createListTx(
+//     seller.publicKey,
+//     sellerAta,
+//     marketplace,
+//     mint,
+//     collection,
+//     program,
+//     config
+//   );
+//
+//   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+//
+//   await execTx(tx, connection, sellerWallet);
+// };
 
 /**
  * Place a bid
@@ -242,55 +233,66 @@ export const placeBid = async (
   console.log("[place_bid] mint", mint.toBase58());
   console.log("[place_bid] bidTokenMint", bidTokenMint.toBase58());
 
-  const tx = await createPlaceBidTx(
-    bidder.publicKey,
-    marketplace,
-    mint,
-    bidTokenMint,
-    program
-  );
+  // const tx = await createPlaceBidTx(
+  //   new PublicKey(auctionId!),
+  //   wallet.publicKey,
+  //   new PublicKey(highestBidder!),
+  //   new BN(currentBid!),
+  //   marketplace,
+  //   mint,
+  //   bidTokenMint,
+  //   program
+  // );
 
-  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+  // const tx = await createPlaceBidTx(
+  //   bidder.publicKey,
+  //   marketplace,
+  //   mint,
+  //   bidTokenMint,
+  //   program
+  // );
 
-  await execTx(tx, connection, bidderWallet);
+  // tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+  //
+  // await execTx(tx, connection, bidderWallet);
 };
 
 /**
  * End an auction
  */
-export const endAuction = async (
-  winner: anchor.web3.Keypair,
-  mint: PublicKey
-) => {
-  const winnerWallet = new NodeWallet(winner);
-
-  // TODO: We currently need `seller` to end the auction such that we know where to transfer rent to
-  // after we're closing the auction. This is not ideal and should be fixed in the future.
-  const [listing, _listingBump] = PublicKey.findProgramAddressSync(
-    [
-      utils.bytes.utf8.encode(LISTING_SEED),
-      marketplace.toBuffer(),
-      mint.toBuffer(),
-    ],
-    program.programId
-  );
-
-  const listingAccount = await program.account.listing.fetch(listing);
-
-  const tx = await createEndAuctionTx(
-    winner.publicKey,
-    listingAccount.seller,
-    listing,
-    marketplace,
-    mint,
-    program,
-    bidTokenMint
-  );
-
-  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-  await execTx(tx, connection, winnerWallet);
-};
+// export const endAuction = async (
+//   winner: anchor.web3.Keypair,
+//   mint: PublicKey
+// ) => {
+//   const winnerWallet = new NodeWallet(winner);
+//
+//   // TODO: We currently need `seller` to end the auction such that we know where to transfer rent to
+//   // after we're closing the auction. This is not ideal and should be fixed in the future.
+//   const [listing, _listingBump] = PublicKey.findProgramAddressSync(
+//     [
+//       utils.bytes.utf8.encode(LISTING_SEED),
+//       marketplace.toBuffer(),
+//       mint.toBuffer(),
+//     ],
+//     program.programId
+//   );
+//
+//   const listingAccount = await program.account.listingV2.fetch(listing);
+//
+//   const tx = await createEndAuctionTx(
+//     winner.publicKey,
+//     listingAccount.seller,
+//     listing,
+//     marketplace,
+//     mint,
+//     program,
+//     bidTokenMint
+//   );
+//
+//   tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+//
+//   await execTx(tx, connection, winnerWallet);
+// };
 
 /**
  * -----------------
@@ -318,7 +320,7 @@ export const findAuctionProgramAddress = (mint: PublicKey) => {
  * Get auction
  */
 export const getAuctionInfo = async (auction: PublicKey) => {
-  const auctionInfo = await program.account.listing.fetch(auction);
+  const auctionInfo = await program.account.listingV2.fetch(auction);
   const escrow = getAssociatedTokenAddressSync(auctionInfo.mint, auction, true);
 
   console.log("Auction Address:", auction.toBase58());
@@ -343,7 +345,7 @@ export const getAuctionInfo = async (auction: PublicKey) => {
 };
 
 export const getAllAuctions = async () => {
-  const auctions = await program.account.listing.all();
+  const auctions = await program.account.listingV2.all();
 
   auctions.forEach(async (auction) => {
     console.log("Auction: ", await getAuctionInfo(auction.publicKey));
