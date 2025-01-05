@@ -1,11 +1,11 @@
 use anchor_lang::{
     prelude::*,
-    system_program::{create_account, CreateAccount},
+    system_program::{assign, create_account, Assign, CreateAccount},
 };
 
 use anchor_spl::{
     token_2022::{
-        initialize_mint2,
+        self, initialize_mint2,
         spl_token_2022::{extension::ExtensionType, pod::PodMint},
         InitializeMint2,
     },
@@ -125,6 +125,17 @@ impl<'info> Initialize<'info> {
             lamports,                       // Lamports
             mint_size as u64,               // Space
             &self.token_program_2022.key(), // Owner Program
+        )?;
+
+        // Assign the mint to the token program
+        assign(
+            CpiContext::new(
+                self.token_program_2022.to_account_info(),
+                Assign {
+                    account_to_assign: self.sbid_mint.to_account_info(),
+                },
+            ),
+            &token_2022::ID,
         )?;
 
         // Initialize the Metadata Pointer

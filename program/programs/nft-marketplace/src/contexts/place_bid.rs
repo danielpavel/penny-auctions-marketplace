@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::Token,
-    token_interface::{transfer_checked, Mint, TokenAccount, TransferChecked},
+    token_interface::{burn, Burn, Mint, TokenAccount},
 };
 
 use crate::{
@@ -42,7 +42,7 @@ pub struct PlaceBid<'info> {
 
     #[account(
         mut,
-        seeds = [b"marketplace".as_ref(), marketplace.name.as_str().as_bytes()],
+        seeds = [b"marketplace".as_ref(), sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
     marketplace: Account<'info, Marketplace>,
@@ -76,7 +76,7 @@ impl<'info> PlaceBid<'info> {
         );
 
         // Transfer the bid token to the vault
-        self.transfer_bid_token()?;
+        self.burn_token()?;
 
         let auction = &mut self.listing;
         auction.current_bid = auction
@@ -100,15 +100,26 @@ impl<'info> PlaceBid<'info> {
         Ok(())
     }
 
-    fn transfer_bid_token(&self) -> Result<()> {
-        let accounts = TransferChecked {
-            from: self.bidder_ata.to_account_info(),
-            to: self.bids_vault.to_account_info(),
+    fn burn_token(&self) -> Result<()> {
+        let bump = [self.marketplace.bump];
+        let signer_seeds: [&[&[u8]]; 1] = [&[
+            b"marketplace",
+            self.sbid_mint.to_account_info().key.as_ref(),
+            self.marketplace.name.as_str().as_bytes(),
+            &bump,
+        ][..]];
+
+        let accounts = Burn {
             mint: self.sbid_mint.to_account_info(),
+            from: self.bidder_ata.to_account_info(),
             authority: self.bidder.to_account_info(),
         };
 
-        let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
+        let cpi_context = CpiContext::new_with_signer(
+            self.token_program.to_account_info(),
+            accounts,
+            &signer_seeds,
+        );
 
         let decimals = self.sbid_mint.decimals;
         let amount = self
@@ -121,7 +132,7 @@ impl<'info> PlaceBid<'info> {
             )
             .ok_or(ProgramError::ArithmeticOverflow)?;
 
-        transfer_checked(cpi_context, amount, decimals)?;
+        burn(cpi_context, amount)?;
 
         Ok(())
     }
