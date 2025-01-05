@@ -22,7 +22,7 @@ pub struct PlaceBid<'info> {
 
     #[account(
         mut,
-        associated_token::mint = bids_mint,
+        associated_token::mint = sbid_mint,
         associated_token::authority = bidder,
     )]
     bidder_ata: InterfaceAccount<'info, TokenAccount>,
@@ -48,13 +48,13 @@ pub struct PlaceBid<'info> {
     marketplace: Account<'info, Marketplace>,
 
     #[account(
-        address = marketplace.bids_mint
+        address = marketplace.sbid_mint
     )]
-    pub bids_mint: InterfaceAccount<'info, Mint>,
+    pub sbid_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
-        associated_token::mint = bids_mint,
+        associated_token::mint = sbid_mint,
         associated_token::authority = marketplace,
     )]
     bids_vault: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -104,13 +104,13 @@ impl<'info> PlaceBid<'info> {
         let accounts = TransferChecked {
             from: self.bidder_ata.to_account_info(),
             to: self.bids_vault.to_account_info(),
-            mint: self.bids_mint.to_account_info(),
+            mint: self.sbid_mint.to_account_info(),
             authority: self.bidder.to_account_info(),
         };
 
         let cpi_context = CpiContext::new(self.token_program.to_account_info(), accounts);
 
-        let decimals = self.bids_mint.decimals;
+        let decimals = self.sbid_mint.decimals;
         let amount = self
             .listing
             .bid_cost

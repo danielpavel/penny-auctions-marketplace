@@ -16,8 +16,17 @@ pub use contexts::*;
 pub mod nft_marketplace {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, name: String, fee: u16) -> Result<()> {
-        ctx.accounts.init(name, fee, &ctx.bumps)
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        name: String,
+        fee: u16,
+        token_name: String,
+        token_symbol: String,
+        uri: String,
+    ) -> Result<()> {
+        ctx.accounts.initialize_marketplace(name, fee, &ctx.bumps)?;
+        ctx.accounts
+            .initialize_non_transferable_mint(token_name, token_symbol, uri)
     }
 
     pub fn list<'info>(

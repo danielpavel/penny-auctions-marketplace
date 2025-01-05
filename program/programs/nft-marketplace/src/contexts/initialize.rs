@@ -1,11 +1,28 @@
-use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface},
+use anchor_lang::{
+    prelude::*,
+    system_program::{create_account, CreateAccount},
 };
 
-use crate::{constants::MARKET_INITIALIZED_LABEL, state::Marketplace};
-use crate::{errors::MarketplaceErrorCode, events::MarketplaceInitialized};
+use anchor_spl::{
+    token_2022::{
+        initialize_mint2,
+        spl_token_2022::{extension::ExtensionType, pod::PodMint},
+        InitializeMint2,
+    },
+    token_interface::{
+        metadata_pointer_initialize, non_transferable_mint_initialize,
+        spl_token_metadata_interface, MetadataPointerInitialize, NonTransferableMintInitialize,
+        Token2022,
+    },
+};
+
+use solana_program::program::invoke_signed;
+
+use crate::state::Marketplace;
+use crate::{
+    constants::MARKET_INITIALIZED_LABEL, errors::MarketplaceErrorCode,
+    events::MarketplaceInitialized,
+};
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -17,31 +34,13 @@ pub struct Initialize<'info> {
         init,
         payer = admin,
         space = 8 + Marketplace::INIT_SPACE,
-        seeds = [b"marketplace".as_ref(), name.as_str().as_bytes()],
+        seeds = [b"marketplace".as_ref(), sbid_mint.key().as_ref(), name.as_str().as_bytes()],
         bump,
     )]
     marketplace: Account<'info, Marketplace>,
 
-    #[account(
-        init,
-        payer = admin,
-        mint::authority = marketplace,
-        mint::decimals = 6,
-        mint::token_program = token_program,
-        seeds = [b"rewards", marketplace.key().as_ref()],
-        bump
-    )]
-    rewards_mint: InterfaceAccount<'info, Mint>,
-
-    bids_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        init,
-        payer = admin,
-        associated_token::mint = bids_mint,
-        associated_token::authority = marketplace,
-    )]
-    bids_vault: InterfaceAccount<'info, TokenAccount>,
+    #[account(mut)]
+    sbid_mint: Signer<'info>,
 
     #[account(
         seeds = [b"treasury", marketplace.key().as_ref()],
@@ -49,13 +48,17 @@ pub struct Initialize<'info> {
     )]
     pub treasury: SystemAccount<'info>,
 
-    pub associated_token_program: Program<'info, AssociatedToken>,
+    token_program_2022: Program<'info, Token2022>,
     system_program: Program<'info, System>,
-    token_program: Interface<'info, TokenInterface>,
 }
 
 impl<'info> Initialize<'info> {
-    pub fn init(&mut self, name: String, fee: u16, bumps: &InitializeBumps) -> Result<()> {
+    pub fn initialize_marketplace(
+        &mut self,
+        name: String,
+        fee: u16,
+        bumps: &InitializeBumps,
+    ) -> Result<()> {
         require!(
             name.len() > 0 && name.len() < 33,
             MarketplaceErrorCode::MarketplaceNameTooLong
@@ -63,12 +66,11 @@ impl<'info> Initialize<'info> {
 
         let inner = Marketplace {
             admin: self.admin.key(),
-            bids_mint: self.bids_mint.key(),
-            bids_vault: self.bids_vault.key(),
+            sbid_mint: self.sbid_mint.key(),
+            treasury: self.treasury.key(),
             fee,
             name,
             bump: bumps.marketplace,
-            rewards_bump: bumps.rewards_mint,
             treasury_bump: bumps.treasury,
         };
 
@@ -79,6 +81,116 @@ impl<'info> Initialize<'info> {
             pubkey: self.marketplace.key(),
             label: MARKET_INITIALIZED_LABEL.to_string()
         });
+
+        Ok(())
+    }
+
+    pub fn initialize_non_transferable_mint(
+        &mut self,
+        token_name: String,
+        token_symbol: String,
+        uri: String,
+    ) -> Result<()> {
+        let bump = [self.marketplace.bump];
+        let signer_seeds: [&[&[u8]]; 1] = [&[
+            b"marketplace",
+            self.sbid_mint.to_account_info().key.as_ref(),
+            self.marketplace.name.as_str().as_bytes(),
+            &bump,
+        ][..]];
+
+        // Calculate space required for mint and extension data
+        let mint_size = ExtensionType::try_calculate_account_len::<PodMint>(&[
+            ExtensionType::NonTransferable,
+            ExtensionType::MetadataPointer,
+        ])?;
+
+        // This is the space required for the metadata account.
+        // We put the meta data into the mint account at the end so we
+        // don't need to create and additional account.
+        let meta_data_space = 250;
+
+        // Calculate minimum lamports required for size of mint account with extensions
+        let lamports = (Rent::get()?).minimum_balance(mint_size + meta_data_space);
+
+        // Invoke System Program to create new account with space for mint and extension data
+        create_account(
+            CpiContext::new(
+                self.system_program.to_account_info(),
+                CreateAccount {
+                    from: self.admin.to_account_info(),
+                    to: self.sbid_mint.to_account_info(),
+                },
+            ),
+            lamports,                       // Lamports
+            mint_size as u64,               // Space
+            &self.token_program_2022.key(), // Owner Program
+        )?;
+
+        // Initialize the Metadata Pointer
+        // This instruction must come before the instruction to initialize the mint data
+        metadata_pointer_initialize(
+            CpiContext::new_with_signer(
+                self.token_program_2022.to_account_info(),
+                MetadataPointerInitialize {
+                    token_program_id: self.token_program_2022.to_account_info(),
+                    mint: self.sbid_mint.to_account_info(),
+                },
+                &signer_seeds,
+            ),
+            Some(self.marketplace.key()),
+            Some(self.sbid_mint.key()),
+        )?;
+
+        // Initialize the NonTransferable extension
+        // This instruction must come before the instruction to initialize the mint data
+        non_transferable_mint_initialize(CpiContext::new(
+            self.token_program_2022.to_account_info(),
+            NonTransferableMintInitialize {
+                token_program_id: self.token_program_2022.to_account_info(),
+                mint: self.sbid_mint.to_account_info(),
+            },
+        ))?;
+
+        // Initialize the standard mint account data
+        initialize_mint2(
+            CpiContext::new(
+                self.token_program_2022.to_account_info(),
+                InitializeMint2 {
+                    mint: self.sbid_mint.to_account_info(),
+                },
+            ),
+            6,                             // decimals
+            &self.marketplace.key(),       // mint authority
+            Some(&self.marketplace.key()), // freeze authority
+        )?;
+
+        // Initialize the metadata
+        let initialize_mint_inst = spl_token_metadata_interface::instruction::initialize(
+            &self.token_program_2022.key,
+            &self.sbid_mint.key(),
+            &self.marketplace.key(),
+            &self.sbid_mint.key(),
+            &self.marketplace.key(),
+            token_name,
+            token_symbol,
+            uri,
+        );
+
+        invoke_signed(
+            &initialize_mint_inst,
+            &vec![
+                // metadata_info
+                self.sbid_mint.to_account_info(),
+                // update_authority_info
+                self.marketplace.to_account_info(),
+                // mint_info
+                self.sbid_mint.to_account_info(),
+                // mint_authority_info
+                self.marketplace.to_account_info(),
+            ],
+            &signer_seeds,
+        )?;
 
         Ok(())
     }
