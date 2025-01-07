@@ -12,6 +12,9 @@
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
+    "@kinobi-so/nodes-from-anchor": "^0.22.0",
+    "@kinobi-so/renderers": "^0.22.0",
+    "@kinobi-so/visitors-core": "^0.22.0",
     "@metaplex-foundation/mpl-token-metadata": "3.1.1",
     "@metaplex-foundation/umi": "^0.8.10",
     "@metaplex-foundation/umi-bundle-defaults": "^0.8.10",

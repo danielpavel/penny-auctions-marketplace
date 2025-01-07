@@ -87,7 +87,7 @@ pub mod nft_marketplace {
         ctx.accounts.end_listing(amount, ctx.remaining_accounts)
     }
 
-    pub fn mint_bid_token<'info>(ctx: Context<MintBidToken>, amount: u64) -> Result<()> {
+    pub fn mint_bid_token(ctx: Context<MintBidToken>, amount: u64) -> Result<()> {
         ctx.accounts.mint_token(amount)
     }
 }

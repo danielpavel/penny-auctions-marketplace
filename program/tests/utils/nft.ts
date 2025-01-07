@@ -29,7 +29,7 @@ export async function createCollectionNft(umi: Umi) {
     uri: "https://arweave.net/123",
     sellerFeeBasisPoints: percentAmount(5.5), // 5.5%
     isCollection: true,
-  }).sendAndConfirm(umi);
+  }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
 
   return result.result.value.err
     ? null
@@ -92,7 +92,9 @@ export async function mintNft({
       });
     }
 
-    let result = await txBuilder.sendAndConfirm(umi);
+    let result = await txBuilder.sendAndConfirm(umi, {
+      confirm: { commitment: "confirmed" },
+    });
 
     if (result.result.value.err) {
       return null;
@@ -135,7 +137,7 @@ export async function mintNftAndVerify({
       metadata,
       collectionMint: fromWeb3JsPublicKey(collection),
       authority: umi.payer,
-    }).sendAndConfirm(umi);
+    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
 
     return { mint: toWeb3JsPublicKey(mint.publicKey), ata };
   } catch (error) {
@@ -169,7 +171,7 @@ export async function createAndMintNftForCollection(
       metadata,
       collectionMint: fromWeb3JsPublicKey(collection),
       authority: umi.payer,
-    }).sendAndConfirm(umi);
+    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
 
     return {
       mint: toWeb3JsPublicKey(mint.publicKey),

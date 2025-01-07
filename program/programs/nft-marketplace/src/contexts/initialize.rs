@@ -30,17 +30,17 @@ pub struct Initialize<'info> {
     #[account(mut)]
     admin: Signer<'info>,
 
+    #[account(mut)]
+    sbid_mint: Signer<'info>,
+
     #[account(
         init,
         payer = admin,
         space = 8 + Marketplace::INIT_SPACE,
-        seeds = [b"marketplace".as_ref(), sbid_mint.key().as_ref(), name.as_str().as_bytes()],
+        seeds = [b"marketplace", admin.key().as_ref(), sbid_mint.key().as_ref(), name.as_str().as_bytes()],
         bump,
     )]
     marketplace: Account<'info, Marketplace>,
-
-    #[account(mut)]
-    sbid_mint: Signer<'info>,
 
     #[account(
         seeds = [b"treasury", marketplace.key().as_ref()],
@@ -94,6 +94,7 @@ impl<'info> Initialize<'info> {
         let bump = [self.marketplace.bump];
         let signer_seeds: [&[&[u8]]; 1] = [&[
             b"marketplace",
+            self.admin.to_account_info().key.as_ref(),
             self.sbid_mint.to_account_info().key.as_ref(),
             self.marketplace.name.as_str().as_bytes(),
             &bump,
@@ -125,17 +126,6 @@ impl<'info> Initialize<'info> {
             lamports,                       // Lamports
             mint_size as u64,               // Space
             &self.token_program_2022.key(), // Owner Program
-        )?;
-
-        // Assign the mint to the token program
-        assign(
-            CpiContext::new(
-                self.token_program_2022.to_account_info(),
-                Assign {
-                    account_to_assign: self.sbid_mint.to_account_info(),
-                },
-            ),
-            &token_2022::ID,
         )?;
 
         // Initialize the Metadata Pointer

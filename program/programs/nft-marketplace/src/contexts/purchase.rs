@@ -53,7 +53,7 @@ pub struct Purchase<'info> {
 
     #[account(
         mut,
-        seeds = [b"marketplace".as_ref(), marketplace.name.as_str().as_bytes()],
+        seeds = [b"marketplace", marketplace.admin.key().as_ref(), marketplace.sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
     marketplace: Account<'info, Marketplace>,

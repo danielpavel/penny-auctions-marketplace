@@ -1,8 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::Token,
-    token_interface::{burn, Burn, Mint, TokenAccount},
+    token_interface::{burn, Burn, Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
@@ -20,12 +19,15 @@ pub struct PlaceBid<'info> {
     #[account(mut)]
     bidder: Signer<'info>,
 
+    #[account(mut)]
+    pub sbid_mint: InterfaceAccount<'info, Mint>,
+
     #[account(
         mut,
         associated_token::mint = sbid_mint,
         associated_token::authority = bidder,
     )]
-    bidder_ata: InterfaceAccount<'info, TokenAccount>,
+    bidder_sbid_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         address = listing.mint
@@ -33,7 +35,6 @@ pub struct PlaceBid<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mut,
         has_one = mint,
         seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
@@ -42,26 +43,15 @@ pub struct PlaceBid<'info> {
 
     #[account(
         mut,
-        seeds = [b"marketplace".as_ref(), sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
+        has_one = sbid_mint,
+        seeds = [b"marketplace", marketplace.admin.key().as_ref(), sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
     marketplace: Account<'info, Marketplace>,
 
-    #[account(
-        address = marketplace.sbid_mint
-    )]
-    pub sbid_mint: InterfaceAccount<'info, Mint>,
-
-    #[account(
-        mut,
-        associated_token::mint = sbid_mint,
-        associated_token::authority = marketplace,
-    )]
-    bids_vault: Box<InterfaceAccount<'info, TokenAccount>>,
-
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    pub token_program: Interface<'info, TokenInterface>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 impl<'info> PlaceBid<'info> {
@@ -104,14 +94,15 @@ impl<'info> PlaceBid<'info> {
         let bump = [self.marketplace.bump];
         let signer_seeds: [&[&[u8]]; 1] = [&[
             b"marketplace",
-            self.sbid_mint.to_account_info().key.as_ref(),
+            self.marketplace.admin.as_ref(),
+            self.marketplace.sbid_mint.as_ref(),
             self.marketplace.name.as_str().as_bytes(),
             &bump,
         ][..]];
 
         let accounts = Burn {
             mint: self.sbid_mint.to_account_info(),
-            from: self.bidder_ata.to_account_info(),
+            from: self.bidder_sbid_ata.to_account_info(),
             authority: self.bidder.to_account_info(),
         };
 

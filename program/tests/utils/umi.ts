@@ -1,28 +1,25 @@
-import { web3 } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { Provider, web3 } from "@coral-xyz/anchor";
 import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
-import {
-  createSignerFromKeypair,
-  signerIdentity,
-} from "@metaplex-foundation/umi";
+import { keypairIdentity } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { fromWeb3JsKeypair } from "@metaplex-foundation/umi-web3js-adapters";
+import { mplToolbox } from "@metaplex-foundation/mpl-toolbox";
 
 import { Keypair } from "@solana/web3.js";
 
-// Stupid hack to make the types work. PS: I hate typescript
-type BothWorldsKeypair = Keypair & web3.Keypair;
+export function initUmi(provider: Provider) {
+  const umi = createUmi(provider.connection.rpcEndpoint, {
+    commitment: "confirmed",
+  });
 
-export function initUmi(connection: web3.Connection, wallet: NodeWallet) {
-  const umi = createUmi(connection.rpcEndpoint, "confirmed");
-
-  const myKeypairSigner = createSignerFromKeypair(
-    umi,
-    fromWeb3JsKeypair(wallet.payer as BothWorldsKeypair)
+  // Anchor Wallet interface is a wrapper over NodeWallet which has payer keypair that we need not exposed to Provider
+  const admin = umi.eddsa.createKeypairFromSecretKey(
+    // @ts-ignore
+    (provider.wallet.payer as Keypair).secretKey
   );
 
-  umi.use(signerIdentity(myKeypairSigner));
+  umi.use(keypairIdentity(admin));
   umi.use(mplTokenMetadata());
+  umi.use(mplToolbox());
 
   return umi;
 }
