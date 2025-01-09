@@ -13,6 +13,7 @@ import { createAndMintNftForCollection } from "./utils/nft";
 import { initUmi } from "./utils/umi";
 
 import {
+  endListing,
   fetchListingV2,
   fetchMarketplace,
   getNftMarketplaceProgramId,
@@ -43,15 +44,13 @@ import {
 import { generateRandomU64Seed, parseAnchorError } from "./utils/utils";
 import { PublicKey } from "@solana/web3.js";
 import {
-  base58,
   bytes,
   string,
   publicKey as publicKeySerializer,
 } from "@metaplex-foundation/umi/serializers";
-import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 
 const options: TransactionBuilderSendAndConfirmOptions = {
-  send: { skipPreflight: true },
+  send: { skipPreflight: false },
   confirm: { commitment: "confirmed" },
 };
 
@@ -578,6 +577,7 @@ describe("nft-marketplace", () => {
         const { errorNumber, errorCode, errorMessage } = parseAnchorError(
           transaction.meta.logs
         );
+
         expect(errorNumber).to.equal(6012);
         expect(errorCode).to.equal("InvalidCurrentHighestBidderAndPrice");
         expect(errorMessage).to.equal(
@@ -599,24 +599,107 @@ describe("nft-marketplace", () => {
     }
   });
 
-  // it("End Auction", async () => {
-  //   const mint = nft.mint;
-  //   const [listing] = PublicKey.findProgramAddressSync(
-  //     [
-  //       anchor.utils.bytes.utf8.encode("listing"),
-  //       marketplace.toBuffer(),
-  //       mint.toBuffer(),
-  //       seed.toArrayLike(Buffer, "le", 8),
-  //     ],
-  //     program.programId
-  //   );
-  //
-  //   const listingAccount = await fetchListingV2(
-  //     umi,
-  //     fromWeb3JsPublicKey(listing)
-  //   );
-  //   console.log(listingAccount);
-  // });
+  it("End Auction", async () => {
+    const mint = nft.mint;
+    const [listing] = PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    const listingAccountOld = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    const userSigner = createSignerFromKeypair(
+      umi,
+      umi.eddsa.createKeypairFromSecretKey(user1.secretKey)
+    );
+
+    const ata = getAssociatedTokenAddressSync(nft.mint, user1.publicKey);
+    const escrow = getAssociatedTokenAddressSync(nft.mint, listing, true);
+
+    const [metadata] = findMetadataPda(umi, {
+      mint: fromWeb3JsPublicKey(mint),
+    });
+    const editionAccount = findMasterEditionPda(umi, {
+      mint: fromWeb3JsPublicKey(mint),
+    })[0];
+
+    await new Promise((resolve) => setTimeout(resolve, 20 * 1000));
+
+    try {
+      await endListing(umi, {
+        user: userSigner,
+        admin,
+        seller: listingAccountOld.seller,
+        userAta: fromWeb3JsPublicKey(ata),
+        mint: fromWeb3JsPublicKey(nft.mint),
+        collection: fromWeb3JsPublicKey(nft.collection),
+        listing: fromWeb3JsPublicKey(listing),
+        marketplace: fromWeb3JsPublicKey(marketplace),
+        escrow: fromWeb3JsPublicKey(escrow),
+        metadata,
+        masterEdition: editionAccount,
+        sysvarInstructions: fromWeb3JsPublicKey(
+          anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY
+        ),
+        amount: BigInt(1),
+      }).sendAndConfirm(umi, options);
+    } catch (err) {
+      console.log(err);
+    }
+
+    const listingAccount = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    // console.log(listingAccount);
+
+    expect(listingAccount.isActive).to.eq(false);
+
+    console.log("1");
+
+    try {
+      // check escrow ATA has been closed
+      await provider.connection.getTokenAccountBalance(escrow);
+    } catch (err) {
+      const msg =
+        "failed to get token account balance: Invalid param: could not find account";
+      expect(err.message).to.equal(msg);
+    }
+
+    console.log("2");
+
+    // check user1 has received the NFT
+    const user1NftAtaBalance = await provider.connection.getTokenAccountBalance(
+      ata
+    );
+    expect(user1NftAtaBalance.value.amount).to.equal("1");
+
+    console.log("3");
+
+    const [treasury] = umi.eddsa.findPda(programId, [
+      bytes().serialize(
+        new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121])
+      ),
+      publicKeySerializer().serialize(fromWeb3JsPublicKey(marketplace)),
+    ]);
+
+    // check treasury has received the current bid amount
+    const treasuryBalance = await provider.connection.getBalance(
+      toWeb3JsPublicKey(treasury)
+    );
+    expect(treasuryBalance).to.equal(
+      Number(listingAccount.currentBid.toString())
+    );
+  });
 
   // it("End Auction", async () => {
   //   const amount = 1;
@@ -1156,21 +1239,3 @@ describe("nft-marketplace", () => {
   });
   */
 });
-
-// Helpers
-const confirmTx = async (signature: string) => {
-  const latestBlockhash = await anchor
-    .getProvider()
-    .connection.getLatestBlockhash();
-  await anchor.getProvider().connection.confirmTransaction(
-    {
-      signature,
-      ...latestBlockhash,
-    },
-    confirmOpts.commitment
-  );
-};
-
-const confirmTxs = async (signatures: string[]) => {
-  await Promise.all(signatures.map(confirmTx));
-};
