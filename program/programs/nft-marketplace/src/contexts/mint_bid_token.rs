@@ -14,7 +14,7 @@ pub struct MintBidToken<'info> {
     admin: Signer<'info>,
 
     #[account(mut)]
-    user: Signer<'info>,
+    pub user: Signer<'info>,
 
     #[account(
         has_one = sbid_mint,
@@ -24,7 +24,7 @@ pub struct MintBidToken<'info> {
     marketplace: Account<'info, Marketplace>,
 
     #[account(mut)]
-    sbid_mint: InterfaceAccount<'info, Mint>,
+    pub sbid_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init,
@@ -32,7 +32,7 @@ pub struct MintBidToken<'info> {
         associated_token::mint = sbid_mint,
         associated_token::authority = user,
     )]
-    user_sbid_ata: InterfaceAccount<'info, TokenAccount>,
+    pub user_sbid_ata: InterfaceAccount<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Interface<'info, TokenInterface>,

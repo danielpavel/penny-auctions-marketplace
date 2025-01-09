@@ -25,7 +25,6 @@ import {
 import {
   ResolvedAccount,
   ResolvedAccountsWithIndices,
-  expectPublicKey,
   getAccountMetasAndSigners,
 } from '../shared';
 
@@ -33,7 +32,7 @@ import {
 export type PlaceBidInstructionAccounts = {
   bidder: Signer;
   sbidMint: PublicKey | Pda;
-  bidderSbidAta?: PublicKey | Pda;
+  bidderSbidAta: PublicKey | Pda;
   mint: PublicKey | Pda;
   listing: PublicKey | Pda;
   marketplace: PublicKey | Pda;
@@ -83,7 +82,7 @@ export type PlaceBidInstructionArgs = PlaceBidInstructionDataArgs;
 
 // Instruction.
 export function placeBid(
-  context: Pick<Context, 'eddsa' | 'programs'>,
+  context: Pick<Context, 'programs'>,
   input: PlaceBidInstructionAccounts & PlaceBidInstructionArgs
 ): TransactionBuilder {
   // Program ID.
@@ -112,7 +111,7 @@ export function placeBid(
     mint: { index: 3, isWritable: false as boolean, value: input.mint ?? null },
     listing: {
       index: 4,
-      isWritable: false as boolean,
+      isWritable: true as boolean,
       value: input.listing ?? null,
     },
     marketplace: {
@@ -141,23 +140,6 @@ export function placeBid(
   const resolvedArgs: PlaceBidInstructionArgs = { ...input };
 
   // Default values.
-  if (!resolvedAccounts.bidderSbidAta.value) {
-    resolvedAccounts.bidderSbidAta.value = context.eddsa.findPda(programId, [
-      publicKeySerializer().serialize(
-        expectPublicKey(resolvedAccounts.bidder.value)
-      ),
-      bytes().serialize(
-        new Uint8Array([
-          6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235,
-          121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126,
-          255, 0, 169,
-        ])
-      ),
-      publicKeySerializer().serialize(
-        expectPublicKey(resolvedAccounts.sbidMint.value)
-      ),
-    ]);
-  }
   if (!resolvedAccounts.systemProgram.value) {
     resolvedAccounts.systemProgram.value = context.programs.getPublicKey(
       'systemProgram',

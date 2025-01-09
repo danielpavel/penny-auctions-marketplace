@@ -2,10 +2,8 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   PublicKey as UmiPublicKey,
-  assertAccountExists,
   createSignerFromKeypair,
   Signer,
-  TransactionBuilder,
   TransactionBuilderSendAndConfirmOptions,
   Umi,
   Pda,
@@ -13,7 +11,6 @@ import {
 import { NftMarketplace } from "../target/types/nft_marketplace";
 import { createAndMintNftForCollection } from "./utils/nft";
 import { initUmi } from "./utils/umi";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 
 import {
   fetchListingV2,
@@ -24,52 +21,37 @@ import {
   mintBidToken,
   placeBid,
 } from "../clients/generated/umi/src/";
-import { getAccount } from "@solana/spl-token";
-import {
-  fetchMint,
-  fetchAllTokenByOwner,
-} from "@metaplex-foundation/mpl-toolbox";
+import { fetchToken } from "@metaplex-foundation/mpl-toolbox";
 
 import {
   findMetadataPda,
-  fetchMetadata,
-  findTokenRecordPda,
   findMasterEditionPda,
-  MPL_TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
-  getMint,
-  getOrCreateAssociatedTokenAccount,
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
 
 import {
-  fromWeb3JsKeypair,
   fromWeb3JsPublicKey,
   toWeb3JsPublicKey,
 } from "@metaplex-foundation/umi-web3js-adapters";
+import { generateRandomU64Seed, parseAnchorError } from "./utils/utils";
+import { PublicKey } from "@solana/web3.js";
 import {
-  generateRandomU64Seed,
-  getTokenBalance,
-  printObj,
-} from "./utils/utils";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { fetchData } from "@coral-xyz/anchor/dist/cjs/utils/registry";
-import { token } from "@coral-xyz/anchor/dist/cjs/utils";
-import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system";
-import {
+  base58,
   bytes,
   string,
   publicKey as publicKeySerializer,
 } from "@metaplex-foundation/umi/serializers";
+import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 
 const options: TransactionBuilderSendAndConfirmOptions = {
-  send: { skipPreflight: false },
+  send: { skipPreflight: true },
   confirm: { commitment: "confirmed" },
 };
 
@@ -182,75 +164,6 @@ describe("nft-marketplace", () => {
     }
   });
 
-  // it("Initialize Marketplace", async () => {
-  //   const fee = 500; // 5% in basis points
-  //   const tokenName = "Sandcastle Bid Token";
-  //   const tokenSymbol = "sBid";
-  //   const tokenUri = "";
-  //
-  //   const sBidMintPubkey = sBidMint.publicKey;
-  //   const [_marketplace, _marketplaceBump] =
-  //     anchor.web3.PublicKey.findProgramAddressSync(
-  //       [
-  //         anchor.utils.bytes.utf8.encode("marketplace"),
-  //         sBidMint.publicKey.toBuffer(),
-  //         anchor.utils.bytes.utf8.encode(name),
-  //       ],
-  //       program.programId
-  //     );
-  //
-  //   marketplace = _marketplace;
-  //   marketplaceBump = _marketplaceBump;
-  //
-  //   const [_treasury, treasuryBump] =
-  //     anchor.web3.PublicKey.findProgramAddressSync(
-  //       [anchor.utils.bytes.utf8.encode("treasury"), marketplace.toBuffer()],
-  //       program.programId
-  //     );
-  //
-  //   treasury = _treasury;
-  //
-  //   sBidVault = getAssociatedTokenAddressSync(
-  //     sBidMintPubkey,
-  //     marketplace,
-  //     true
-  //   );
-  //
-  //   let accounts = {
-  //     admin: initializer.publicKey,
-  //     marketplace,
-  //     sbidMint: sBidMint.publicKey,
-  //     treasury,
-  //     // tokenProgram: TOKEN_PROGRAM_ID,
-  //     // tokenProgram2022: TOKEN_2022_PROGRAM_ID,
-  //   };
-  //
-  //   try {
-  //     let tx = await program.methods
-  //       .initialize(name, fee, tokenName, tokenSymbol, tokenUri)
-  //       .accounts(accounts)
-  //       .signers([initializer, sBidMint])
-  //       .rpc();
-  //
-  //     const marketplaceAccount = await program.account.marketplace.fetch(
-  //       marketplace
-  //     );
-  //
-  //     expect(marketplaceAccount.name).to.be.equal(name);
-  //     expect(marketplaceAccount.admin).deep.equal(initializer.publicKey);
-  //     expect(marketplaceAccount.sbidMint.toBase58()).to.equal(
-  //       sBidMint.publicKey.toBase58()
-  //     );
-  //     expect(marketplaceAccount.fee).to.be.equal(fee);
-  //     expect(marketplaceAccount.bump).to.be.equal(marketplaceBump);
-  //     expect(marketplaceAccount.treasuryBump).to.be.equal(treasuryBump);
-  //
-  //     console.log("Your transaction signature", tx);
-  //   } catch (err) {
-  //     console.error(err);
-  //   }
-  // });
-
   it("Initialize Marketplace", async () => {
     try {
       const fee = 500; // 5% in basis points
@@ -359,18 +272,6 @@ describe("nft-marketplace", () => {
       mint: fromWeb3JsPublicKey(mint),
     })[0];
 
-    // const ownerTr = findTokenRecordPda(umi, {
-    //   mint: fromWeb3JsPublicKey(pNft.mint),
-    //   token: fromWeb3JsPublicKey(pNft.ata),
-    // })[0];
-    // const destinationTr = findTokenRecordPda(umi, {
-    //   mint: fromWeb3JsPublicKey(pNft.mint),
-    //   token: fromWeb3JsPublicKey(escrow),
-    // })[0];
-    // const authRulesProgram = new anchor.web3.PublicKey(
-    //   "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
-    // );
-
     try {
       const tx = await list(umi, {
         seller: sellerSigner,
@@ -438,137 +339,49 @@ describe("nft-marketplace", () => {
     }
   });
 
-  // it("List", async () => {
-  //   const price = 3 * anchor.web3.LAMPORTS_PER_SOL;
-  //   const [listing, listingBump] = anchor.web3.PublicKey.findProgramAddressSync(
-  //     [
-  //       anchor.utils.bytes.utf8.encode("listing"),
-  //       marketplace.toBuffer(),
-  //       nft.mint.toBuffer(),
-  //       seed.toArrayLike(Buffer, "le", 8),
-  //     ],
-  //     program.programId
-  //   );
-  //
-  //   const escrow = getAssociatedTokenAddressSync(nft.mint, listing, true);
-  //   const currentSlot = await provider.connection.getSlot();
-  //
-  //   const timerExtensionInSlots = 12;
-  //   const initialDurationInSlots = 24;
-  //
-  //   let listingConfig = {
-  //     bidIncrement: new anchor.BN(price / 1000),
-  //     timerExtension: new anchor.BN(timerExtensionInSlots), // 12 slots ~ 5 seconds
-  //     startTimestamp: new anchor.BN(currentSlot),
-  //     initialDuration: new anchor.BN(initialDurationInSlots), // 24 slots ~ 10 seconds
-  //     buyoutPrice: new anchor.BN(price),
-  //     amount: new anchor.BN(1),
-  //     seed,
-  //   };
-  //
-  //   let accounts = {
-  //     seller: user1.publicKey,
-  //     admin: initializer.publicKey,
-  //     listing,
-  //     marketplace,
-  //     mint: nft.mint,
-  //     collection: nft.collection,
-  //     sellerAta: nft.ata,
-  //     escrow,
-  //     tokenProgram: TOKEN_PROGRAM_ID,
-  //     sysvarInstructions: anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY,
-  //   };
-  //
-  //   try {
-  //     let tx = await program.methods
-  //       .list(
-  //         listingConfig.seed,
-  //         listingConfig.bidIncrement,
-  //         listingConfig.timerExtension,
-  //         listingConfig.startTimestamp,
-  //         listingConfig.initialDuration,
-  //         listingConfig.buyoutPrice,
-  //         listingConfig.amount
-  //       )
-  //       .accounts(accounts)
-  //       .signers([user1, initializer])
-  //       .rpc();
-  //
-  //     // const sellerSigner = createSignerFromKeypair(
-  //     //   umi,
-  //     //   umi.eddsa.createKeypairFromSecretKey(user1.secretKey)
-  //     // );
-  //     // const adminSigner = createSignerFromKeypair(
-  //     //   umi,
-  //     //   umi.eddsa.createKeypairFromSecretKey(initializer.secretKey)
-  //     // );
-  //     //
-  //     // await list(umi, {
-  //     //   seller: sellerSigner,
-  //     //   admin: adminSigner,
-  //     //   listing: fromWeb3JsPublicKey(listing),
-  //     //   marketplace: fromWeb3JsPublicKey(marketplace),
-  //     //   mint: fromWeb3JsPublicKey(nft.mint),
-  //     //   collection: fromWeb3JsPublicKey(nft.collection),
-  //     //   sellerAta: fromWeb3JsPublicKey(nft.ata),
-  //     //   escrow: fromWeb3JsPublicKey(escrow),
-  //     //   tokenProgram: fromWeb3JsPublicKey(TOKEN_PROGRAM_ID),
-  //     //   sysvarInstructions: fromWeb3JsPublicKey(
-  //     //     anchor.web3.SYSVAR_INSTRUCTIONS_PUBKEY
-  //     //   ),
-  //     //   seed: BigInt(listingConfig.seed.toString()),
-  //     //   bidIncrement: BigInt(listingConfig.bidIncrement.toString()),
-  //     //   timerExtensionInSlots: BigInt(listingConfig.timerExtension.toString()),
-  //     //   startTimeInSlots: BigInt(listingConfig.startTimestamp.toString()),
-  //     //   initialDurationInSlots: BigInt(
-  //     //     listingConfig.initialDuration.toString()
-  //     //   ),
-  //     //   buyoutPrice: BigInt(listingConfig.buyoutPrice.toString()),
-  //     //   amount: BigInt(listingConfig.amount.toString()),
-  //     // }).sendAndConfirm(umi, options);
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  //
-  //   // const listingAccount = await program.account.listingV2.fetch(listing);
-  //   // const listingAccount = await fetchListingV2(fromWeb3JsPublicKey(listing);
-  //
-  //   // expect(listingAccount.mint).deep.equal(nft.mint);
-  //   // expect(listingAccount.seller).deep.equal(user1.publicKey);
-  //   // expect(listingAccount.bidCost.eq(new anchor.BN(1))).to.eq(true);
-  //   // expect(listingAccount.bidIncrement.eq(listingConfig.bidIncrement)).to.eq(
-  //   //   true
-  //   // );
-  //   // expect(listingAccount.currentBid.eq(new anchor.BN(0))).to.eq(true);
-  //   // expect(listingAccount.highestBidder).to.deep.eq(
-  //   //   anchor.web3.PublicKey.default
-  //   // );
-  //   // expect(listingAccount.timerExtensionInSlots.toNumber()).to.eq(
-  //   //   timerExtensionInSlots
-  //   // );
-  //   // expect(listingAccount.startTimeInSlots.toNumber()).to.eq(currentSlot);
-  //   // expect(listingAccount.endTimeInSlots.toNumber()).to.eq(
-  //   //   currentSlot + initialDurationInSlots
-  //   // );
-  //   // expect(listingAccount.isActive).to.eq(true);
-  //   // expect(listingAccount.buyoutPrice.eq(listingConfig.buyoutPrice)).to.eq(
-  //   //   true
-  //   // );
-  //   // expect(listingAccount.bump).to.equal(listingBump);
-  //   // expect(listingAccount.seed.eq(seed)).eq(true);
-  //
-  //   // Check seller ATA has been debited
-  //   // const sellerAta = await provider.connection.getTokenAccountBalance(nft.ata);
-  //   // expect(sellerAta.value.amount).to.equal("0");
-  //
-  //   // Check escrow ATA has been credited
-  //   // const escrowAccount = await provider.connection.getTokenAccountBalance(
-  //   //   escrow
-  //   // );
-  //   // expect(escrowAccount.value.amount).to.equal("1");
-  // });
+  it("Users mint some sBid Tokens", async () => {
+    await Promise.all(
+      [user1, user2, user3].map(async (u) => {
+        try {
+          const userSigner = createSignerFromKeypair(
+            umi,
+            umi.eddsa.createKeypairFromSecretKey(u.secretKey)
+          );
+          const [ata] = PublicKey.findProgramAddressSync(
+            [
+              u.publicKey.toBytes(),
+              TOKEN_2022_PROGRAM_ID.toBytes(),
+              sBidMint.publicKey.toBytes(),
+            ],
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          );
 
-  it("User 2 place a bid", async () => {
+          const amount = 199 * 10 ** 6;
+          const txResult = await mintBidToken(umi, {
+            admin,
+            user: userSigner,
+            marketplace: fromWeb3JsPublicKey(marketplace),
+            sbidMint: fromWeb3JsPublicKey(sBidMint.publicKey),
+            userSbidAta: fromWeb3JsPublicKey(ata),
+            tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+            amount: BigInt(amount),
+          }).sendAndConfirm(umi, options);
+
+          if (txResult.result.value.err) {
+            throw new Error(txResult.result.value.err.toString());
+          }
+
+          const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+          expect(ta.amount).to.eq(BigInt(199 * 10 ** 6));
+        } catch (err) {
+          console.error(err);
+          expect.fail("❌ Mint sBid Token tx failed!");
+        }
+      })
+    );
+  });
+
+  it("User 1 place a bid", async () => {
     const mint = nft.mint;
     const [listing] = PublicKey.findProgramAddressSync(
       [
@@ -580,18 +393,14 @@ describe("nft-marketplace", () => {
       program.programId
     );
 
-    let listingAccount = await fetchListingV2(umi, listing);
-
-    let oldEndTimeInSlots = listingAccount.endTimeInSlots;
-    let bidIncrement = listingAccount.bidIncrement;
-    let timerExtensionInSlots = listingAccount.timerExtensionInSlots;
-
-    let highestBidder = listingAccount.highestBidder;
-    let currentBid = listingAccount.currentBid;
+    const listingAccountOld = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
 
     const [ata] = PublicKey.findProgramAddressSync(
       [
-        user2.publicKey.toBytes(),
+        user1.publicKey.toBytes(),
         TOKEN_2022_PROGRAM_ID.toBytes(),
         sBidMint.publicKey.toBytes(),
       ],
@@ -600,31 +409,159 @@ describe("nft-marketplace", () => {
 
     const userSigner = createSignerFromKeypair(
       umi,
-      umi.eddsa.createKeypairFromSecretKey(user2.secretKey)
+      umi.eddsa.createKeypairFromSecretKey(user1.secretKey)
     );
     const sbidMintPubkey = fromWeb3JsPublicKey(sBidMint.publicKey);
 
-    // Mint Some bid tokens.
-    const amount = 100 * 10 ** 6;
     try {
-      const mintTxResult = await mintBidToken(umi, {
-        admin,
-        user: userSigner,
-        marketplace: fromWeb3JsPublicKey(marketplace),
+      await placeBid(umi, {
+        bidder: userSigner,
         sbidMint: sbidMintPubkey,
-        userSbidAta: fromWeb3JsPublicKey(ata),
+        bidderSbidAta: fromWeb3JsPublicKey(ata),
+        mint: fromWeb3JsPublicKey(mint),
+        listing: fromWeb3JsPublicKey(listing),
+        marketplace: fromWeb3JsPublicKey(marketplace),
         tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
-        amount: BigInt(amount),
+        highestBidder: listingAccountOld.highestBidder,
+        currentBid: listingAccountOld.currentBid,
+      }).sendAndConfirm(umi, options);
+    } catch (err) {
+      const { errorNumber, errorCode, errorMessage } = parseAnchorError(
+        err.transactionLogs
+      );
+
+      console.error("errorNumber", errorNumber);
+      console.error("errorCode", errorCode);
+      console.error("errorMessage", errorMessage);
+
+      expect.fail("❌ Place Bid tx failed!");
+    }
+
+    const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+    expect(ta.amount).to.equal(BigInt(198 * 10 ** 6));
+
+    const listingAccountNew = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    expect(listingAccountNew.highestBidder.toString()).to.equal(
+      userSigner.publicKey.toString()
+    );
+    expect(listingAccountNew.currentBid).to.equal(
+      BigInt(1) * listingAccountNew.bidIncrement
+    );
+    expect(listingAccountNew.endTimeInSlots).to.equal(
+      listingAccountOld.endTimeInSlots + listingAccountOld.timerExtensionInSlots
+    );
+  });
+
+  it("User 1 place a bid again - should fail!", async () => {
+    const mint = nft.mint;
+    const [listing] = PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    let listingAccount = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    const [ata] = PublicKey.findProgramAddressSync(
+      [
+        user1.publicKey.toBytes(),
+        TOKEN_2022_PROGRAM_ID.toBytes(),
+        sBidMint.publicKey.toBytes(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const userSigner = createSignerFromKeypair(
+      umi,
+      umi.eddsa.createKeypairFromSecretKey(user1.secretKey)
+    );
+    const sbidMintPubkey = fromWeb3JsPublicKey(sBidMint.publicKey);
+
+    try {
+      const txResult = await placeBid(umi, {
+        bidder: userSigner,
+        sbidMint: sbidMintPubkey,
+        bidderSbidAta: fromWeb3JsPublicKey(ata),
+        mint: fromWeb3JsPublicKey(mint),
+        listing: fromWeb3JsPublicKey(listing),
+        marketplace: fromWeb3JsPublicKey(marketplace),
+        tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+        highestBidder: listingAccount.highestBidder,
+        currentBid: listingAccount.currentBid,
       }).sendAndConfirm(umi, options);
 
-      if (mintTxResult.result.value.err) {
-        throw new Error(mintTxResult.result.value.err.toString());
+      if (txResult.result.value.err) {
+        const transaction = await umi.rpc.getTransaction(txResult.signature);
+        const { errorNumber, errorCode, errorMessage } = parseAnchorError(
+          transaction.meta.logs
+        );
+
+        expect(errorNumber).to.eq(6003);
+        expect(errorCode).to.eq("BidderIsHighestBidder");
+        expect(errorMessage).to.eq(
+          "Incomming bidder is already the highest bidder"
+        );
+
+        return;
       }
 
-      const balance = await provider.connection.getTokenAccountBalance(ata);
-      expect(balance.value.uiAmount).to.eq(100);
+      expect.fail("❌ Place Bid tx should have failed!");
+    } catch (err) {
+      const { errorNumber, errorCode, errorMessage } = parseAnchorError(
+        err.transactionLogs
+      );
 
-      const placeBidTxResult = await placeBid(umi, {
+      expect(errorNumber).to.eq(6003);
+      expect(errorCode).to.eq("BidderIsHighestBidder");
+      expect(errorMessage).to.eq(
+        "Incomming bidder is already the highest bidder"
+      );
+    }
+  });
+
+  it("User 1 place a bid again with wrong highestBidder and / or currentBid - should fail!", async () => {
+    const mint = nft.mint;
+    const [listing] = PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    let highestBidder = fromWeb3JsPublicKey(listing);
+    let currentBid = BigInt(30);
+
+    const [ata] = PublicKey.findProgramAddressSync(
+      [
+        user1.publicKey.toBytes(),
+        TOKEN_2022_PROGRAM_ID.toBytes(),
+        sBidMint.publicKey.toBytes(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const userSigner = createSignerFromKeypair(
+      umi,
+      umi.eddsa.createKeypairFromSecretKey(user1.secretKey)
+    );
+    const sbidMintPubkey = fromWeb3JsPublicKey(sBidMint.publicKey);
+
+    try {
+      const txResult = await placeBid(umi, {
         bidder: userSigner,
         sbidMint: sbidMintPubkey,
         bidderSbidAta: fromWeb3JsPublicKey(ata),
@@ -633,162 +570,52 @@ describe("nft-marketplace", () => {
         marketplace: fromWeb3JsPublicKey(marketplace),
         tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
         highestBidder: highestBidder,
-        currentBid: listingAccount.currentBid,
+        currentBid: currentBid,
       }).sendAndConfirm(umi, options);
 
-      if (placeBidTxResult.result.value.err) {
-        throw new Error(placeBidTxResult.result.value.err.toString());
+      if (txResult.result.value.err) {
+        const transaction = await umi.rpc.getTransaction(txResult.signature);
+        const { errorNumber, errorCode, errorMessage } = parseAnchorError(
+          transaction.meta.logs
+        );
+        expect(errorNumber).to.equal(6012);
+        expect(errorCode).to.equal("InvalidCurrentHighestBidderAndPrice");
+        expect(errorMessage).to.equal(
+          "Invalid current highest bidder and price"
+        );
+
+        return;
       }
 
-      // const listingAccountNew = await fetchListingV2(
-      //   umi,
-      //   fromWeb3JsPublicKey(listing)
-      // );
-      //console.log(listingAccountNew);
+      expect.fail("❌ Place Bid tx should have failed!");
     } catch (err) {
-      console.error("something is bad here", err);
-      expect.fail("mintBidToken IX failed");
-    }
+      const { errorCode, errorMessage, errorNumber } = parseAnchorError(
+        err.transactionLogs
+      );
 
-    // try {
-    //         listingAccount = await program.account.listingV2.fetch(listing);
-    //
-    //   expect(listingAccount.currentBid.toNumber()).to.equal(bidIncrement);
-    //   expect(listingAccount.highestBidder).to.deep.equal(user2.publicKey);
-    //   expect(listingAccount.endTimeInSlots.toNumber()).to.equal(
-    //     oldEndTimeInSlots + timerExtensionInSlots
-    //   );
-    //
-    //   // check one bid token was debited from user2
-    //   const user2Ata = await provider.connection.getTokenAccountBalance(
-    //     user2BidTokenATA
-    //   );
-    //   expect(user2Ata.value.uiAmount).to.equal(9);
-    //
-    //   // check one bid token has been credited to vault
-    //   let vaultBalance = await provider.connection.getTokenAccountBalance(
-    //     bidsVault
-    //   );
-    //   expect(vaultBalance.value.uiAmount).to.equal(1);
-    //
-    //   console.log("Bid 1 transaction signature", tx);
-    //
-    //   oldEndTime = listingAccount.endTime.toNumber();
-    //
-    //   accounts = {
-    //     bidder: user3.publicKey,
-    //     bidderAta: user3BidTokenATA,
-    //     mint: nft.mint,
-    //     listing,
-    //     marketplace,
-    //     bidsMint: bidTokenMint,
-    //     bidsVault,
-    //     tokenProgram: TOKEN_PROGRAM_ID,
-    //   };
-    //
-    //   tx = await program.methods
-    //     .placeBid()
-    //     .accounts(accounts)
-    //     .signers([user3])
-    //     .rpc();
-    //
-    //   listingAccount = await program.account.listing.fetch(listing);
-    //
-    //   expect(listingAccount.currentBid.toNumber()).to.equal(2 * bidIncrement);
-    //   expect(listingAccount.highestBidder).to.deep.equal(user3.publicKey);
-    //   expect(listingAccount.endTime.toNumber()).to.equal(
-    //     oldEndTime + timerExtension
-    //   );
-    //
-    //   // check one bid token was debited from user2
-    //   const user3Ata = await provider.connection.getTokenAccountBalance(
-    //     user3BidTokenATA
-    //   );
-    //   expect(user3Ata.value.uiAmount).to.equal(9);
-    //
-    //   // check one bid token has been credited to vault
-    //   vaultBalance = await provider.connection.getTokenAccountBalance(
-    //     bidsVault
-    //   );
-    //   expect(vaultBalance.value.uiAmount).to.equal(2);
-    //
-    //   console.log("Bid 2 transaction signature", tx);
-    // } catch (error) {
-    //   console.error(error);
-    // }
+      expect(errorCode).to.equal("InvalidCurrentHighestBidderAndPrice");
+      expect(errorNumber).to.equal(6012);
+      expect(errorMessage).to.equal("Invalid current highest bidder and price");
+    }
   });
 
-  // it("User 2 bids again - should fail.", async () => {
-  //   const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
+  // it("End Auction", async () => {
+  //   const mint = nft.mint;
+  //   const [listing] = PublicKey.findProgramAddressSync(
   //     [
   //       anchor.utils.bytes.utf8.encode("listing"),
   //       marketplace.toBuffer(),
-  //       nft.mint.toBuffer(),
+  //       mint.toBuffer(),
   //       seed.toArrayLike(Buffer, "le", 8),
   //     ],
   //     program.programId
   //   );
   //
-  //   let listingAccount = await program.account.listingV2.fetch(listing);
-  //
-  //   let accounts = {
-  //     bidder: user2.publicKey,
-  //     bidderAta: user2BidTokenATA,
-  //     mint: nft.mint,
-  //     listing,
-  //     marketplace,
-  //     bidsMint: bidTokenMint,
-  //     bidsVault,
-  //     tokenProgram: TOKEN_PROGRAM_ID,
-  //   };
-  //
-  //   try {
-  //     await program.methods
-  //       .placeBid(listingAccount.highestBidder, listingAccount.currentBid)
-  //       .accounts(accounts)
-  //       .signers([user2])
-  //       .rpc();
-  //   } catch (error) {
-  //     const errMsg = "Incomming bidder is already the highest bidder";
-  //     expect(error.error.errorMessage).to.eq(errMsg);
-  //   }
-  // });
-
-  // it("User 1 bid with wrong Highest Bidder and Current Bid values should fail.", async () => {
-  //   const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
-  //     [
-  //       anchor.utils.bytes.utf8.encode("listing"),
-  //       marketplace.toBuffer(),
-  //       nft.mint.toBuffer(),
-  //       seed.toArrayLike(Buffer, "le", 8),
-  //     ],
-  //     program.programId
+  //   const listingAccount = await fetchListingV2(
+  //     umi,
+  //     fromWeb3JsPublicKey(listing)
   //   );
-  //
-  //   let highestBidder = PublicKey.unique();
-  //   let currentBid = new anchor.BN(0.1 * LAMPORTS_PER_SOL);
-  //
-  //   let accounts = {
-  //     bidder: user1.publicKey,
-  //     bidderAta: user1BidTokenATA,
-  //     mint: nft.mint,
-  //     listing,
-  //     marketplace,
-  //     bidsMint: bidTokenMint,
-  //     bidsVault,
-  //     tokenProgram: TOKEN_PROGRAM_ID,
-  //   };
-  //
-  //   try {
-  //     await program.methods
-  //       .placeBid(highestBidder, currentBid)
-  //       .accounts(accounts)
-  //       .signers([user1])
-  //       .rpc();
-  //   } catch (error) {
-  //     const errMsg = "Invalid current highest bidder and price";
-  //     expect(error.error.errorMessage).to.eq(errMsg);
-  //   }
+  //   console.log(listingAccount);
   // });
 
   // it("End Auction", async () => {

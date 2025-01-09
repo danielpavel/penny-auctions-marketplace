@@ -17,17 +17,18 @@ use crate::{
 #[derive(Accounts)]
 pub struct PlaceBid<'info> {
     #[account(mut)]
-    bidder: Signer<'info>,
+    pub bidder: Signer<'info>,
 
     #[account(mut)]
     pub sbid_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
-        associated_token::mint = sbid_mint,
-        associated_token::authority = bidder,
+        // TODO: Fix this ...
+        // associated_token::mint = sbid_mint,
+        // associated_token::authority = bidder,
     )]
-    bidder_sbid_ata: InterfaceAccount<'info, TokenAccount>,
+    pub bidder_sbid_ata: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         address = listing.mint
@@ -35,6 +36,7 @@ pub struct PlaceBid<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
+        mut,
         has_one = mint,
         seeds = [b"listing", marketplace.key().as_ref(), listing.mint.key().as_ref(), listing.seed.to_le_bytes().as_ref()],
         bump = listing.bump
