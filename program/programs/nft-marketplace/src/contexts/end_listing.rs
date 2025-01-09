@@ -7,9 +7,9 @@ use anchor_spl::{
 };
 
 use crate::{
-    constants::LISTING_ENDED_LABEL,
+    constants::{LISTING_ENDED_LABEL, REWARD_TIER_3},
     events::ListingEnded,
-    state::{ListingV2, Marketplace},
+    state::{ListingV2, Marketplace, UserAccount},
     transfer::transfer_asset,
     utils::{assert_allowed_claimer, assert_auction_ended, transfer_sol, MarketplaceErrorCode},
 };
@@ -23,6 +23,16 @@ pub struct EndListing<'info> {
         address = marketplace.admin @ MarketplaceErrorCode::InvalidListingAuthority
     )]
     admin: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserAccount::INIT_SPACE,
+        seeds = [b"user", marketplace.key().as_ref(), user.key().as_ref()],
+        bump
+        )
+    ]
+    pub user_account: Account<'info, UserAccount>,
 
     #[account(
         mut,
@@ -177,5 +187,22 @@ impl<'info> EndListing<'info> {
         );
 
         close_account(ctx)
+    }
+
+    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
+        self.user_account.bump = bump;
+
+        self.user_account.points = self
+            .user_account
+            .points
+            .checked_add(REWARD_TIER_3)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+        self.user_account.total_auctions_won = self
+            .user_account
+            .total_bids_placed
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        Ok(())
     }
 }

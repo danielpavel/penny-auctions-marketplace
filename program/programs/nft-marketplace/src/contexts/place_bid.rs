@@ -5,9 +5,9 @@ use anchor_spl::{
 };
 
 use crate::{
-    constants::BID_PLACED_LABEL,
+    constants::{BID_PLACED_LABEL, REWARD_TIER_1},
     events::BidPlaced,
-    state::{ListingV2, Marketplace},
+    state::{ListingV2, Marketplace, UserAccount},
     utils::{
         assert_already_highest_bidder, assert_auction_active,
         assert_correct_highest_bidder_and_bid, MarketplaceErrorCode,
@@ -18,6 +18,16 @@ use crate::{
 pub struct PlaceBid<'info> {
     #[account(mut)]
     pub bidder: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = bidder,
+        space = 8 + UserAccount::INIT_SPACE,
+        seeds = [b"user", marketplace.key().as_ref(), bidder.key().as_ref()],
+        bump
+        )
+    ]
+    pub user_account: Account<'info, UserAccount>,
 
     #[account(mut)]
     pub sbid_mint: InterfaceAccount<'info, Mint>,
@@ -126,6 +136,23 @@ impl<'info> PlaceBid<'info> {
             .ok_or(ProgramError::ArithmeticOverflow)?;
 
         burn(cpi_context, amount)?;
+
+        Ok(())
+    }
+
+    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
+        self.user_account.bump = bump;
+
+        self.user_account.points = self
+            .user_account
+            .points
+            .checked_add(REWARD_TIER_1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+        self.user_account.total_bids_placed = self
+            .user_account
+            .total_bids_placed
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
         Ok(())
     }

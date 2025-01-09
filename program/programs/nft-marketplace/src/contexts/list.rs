@@ -12,9 +12,9 @@ use anchor_spl::{
 };
 
 use crate::{
-    constants::LISTING_CREATED_LABEL,
+    constants::{LISTING_CREATED_LABEL, REWARD_TIER_2},
     events::ListingCreated,
-    state::{ListingV2, Marketplace},
+    state::{ListingV2, Marketplace, UserAccount},
     transfer::transfer_asset,
     utils::MarketplaceErrorCode,
 };
@@ -29,6 +29,16 @@ pub struct List<'info> {
         address = marketplace.admin @ MarketplaceErrorCode::InvalidListingAuthority
     )]
     admin: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = seller,
+        space = 8 + UserAccount::INIT_SPACE,
+        seeds = [b"user", marketplace.key().as_ref(), seller.key().as_ref()],
+        bump
+        )
+    ]
+    pub user_account: Account<'info, UserAccount>,
 
     #[account(
         init,
@@ -228,5 +238,22 @@ impl<'info> List<'info> {
             pubkey: self.listing.key(),
             label: LISTING_CREATED_LABEL.to_string(),
         });
+    }
+
+    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
+        self.user_account.bump = bump;
+
+        self.user_account.points = self
+            .user_account
+            .points
+            .checked_add(REWARD_TIER_2)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+        self.user_account.total_auctions_created = self
+            .user_account
+            .total_auctions_created
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        Ok(())
     }
 }

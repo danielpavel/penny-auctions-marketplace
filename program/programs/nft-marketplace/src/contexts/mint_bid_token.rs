@@ -4,7 +4,10 @@ use anchor_spl::{
     token_interface::{mint_to, Mint, MintTo, TokenAccount, TokenInterface},
 };
 
-use crate::state::Marketplace;
+use crate::{
+    constants::REWARD_TIER_1,
+    state::{Marketplace, UserAccount},
+};
 
 #[derive(Accounts)]
 pub struct MintBidToken<'info> {
@@ -15,6 +18,16 @@ pub struct MintBidToken<'info> {
 
     #[account(mut)]
     pub user: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        space = 8 + UserAccount::INIT_SPACE,
+        seeds = [b"user", marketplace.key().as_ref(), user.key().as_ref()],
+        bump
+        )
+    ]
+    pub user_account: Account<'info, UserAccount>,
 
     #[account(
         has_one = sbid_mint,
@@ -63,5 +76,22 @@ impl<'info> MintBidToken<'info> {
         );
 
         mint_to(cpi_context, amount)
+    }
+
+    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
+        self.user_account.bump = bump;
+
+        self.user_account.points = self
+            .user_account
+            .points
+            .checked_add(REWARD_TIER_1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+        self.user_account.total_bids_placed = self
+            .user_account
+            .total_bids_placed
+            .checked_add(1)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        Ok(())
     }
 }

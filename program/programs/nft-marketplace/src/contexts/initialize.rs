@@ -1,11 +1,11 @@
 use anchor_lang::{
     prelude::*,
-    system_program::{assign, create_account, Assign, CreateAccount},
+    system_program::{create_account, CreateAccount},
 };
 
 use anchor_spl::{
     token_2022::{
-        self, initialize_mint2,
+        initialize_mint2,
         spl_token_2022::{extension::ExtensionType, pod::PodMint},
         InitializeMint2,
     },
