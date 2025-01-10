@@ -25,12 +25,14 @@ import {
 import {
   ResolvedAccount,
   ResolvedAccountsWithIndices,
+  expectPublicKey,
   getAccountMetasAndSigners,
 } from '../shared';
 
 // Accounts.
 export type PlaceBidInstructionAccounts = {
   bidder: Signer;
+  userAccount?: PublicKey | Pda;
   sbidMint: PublicKey | Pda;
   bidderSbidAta: PublicKey | Pda;
   mint: PublicKey | Pda;
@@ -82,7 +84,7 @@ export type PlaceBidInstructionArgs = PlaceBidInstructionDataArgs;
 
 // Instruction.
 export function placeBid(
-  context: Pick<Context, 'programs'>,
+  context: Pick<Context, 'eddsa' | 'programs'>,
   input: PlaceBidInstructionAccounts & PlaceBidInstructionArgs
 ): TransactionBuilder {
   // Program ID.
@@ -98,39 +100,44 @@ export function placeBid(
       isWritable: true as boolean,
       value: input.bidder ?? null,
     },
-    sbidMint: {
+    userAccount: {
       index: 1,
+      isWritable: true as boolean,
+      value: input.userAccount ?? null,
+    },
+    sbidMint: {
+      index: 2,
       isWritable: true as boolean,
       value: input.sbidMint ?? null,
     },
     bidderSbidAta: {
-      index: 2,
+      index: 3,
       isWritable: true as boolean,
       value: input.bidderSbidAta ?? null,
     },
-    mint: { index: 3, isWritable: false as boolean, value: input.mint ?? null },
+    mint: { index: 4, isWritable: false as boolean, value: input.mint ?? null },
     listing: {
-      index: 4,
+      index: 5,
       isWritable: true as boolean,
       value: input.listing ?? null,
     },
     marketplace: {
-      index: 5,
+      index: 6,
       isWritable: true as boolean,
       value: input.marketplace ?? null,
     },
     systemProgram: {
-      index: 6,
+      index: 7,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },
     tokenProgram: {
-      index: 7,
+      index: 8,
       isWritable: false as boolean,
       value: input.tokenProgram ?? null,
     },
     associatedTokenProgram: {
-      index: 8,
+      index: 9,
       isWritable: false as boolean,
       value: input.associatedTokenProgram ?? null,
     },
@@ -140,6 +147,17 @@ export function placeBid(
   const resolvedArgs: PlaceBidInstructionArgs = { ...input };
 
   // Default values.
+  if (!resolvedAccounts.userAccount.value) {
+    resolvedAccounts.userAccount.value = context.eddsa.findPda(programId, [
+      bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.marketplace.value)
+      ),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.bidder.value)
+      ),
+    ]);
+  }
   if (!resolvedAccounts.systemProgram.value) {
     resolvedAccounts.systemProgram.value = context.programs.getPublicKey(
       'systemProgram',

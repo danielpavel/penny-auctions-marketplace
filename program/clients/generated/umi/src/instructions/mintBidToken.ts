@@ -33,6 +33,7 @@ import {
 export type MintBidTokenInstructionAccounts = {
   admin: Signer;
   user: Signer;
+  userAccount?: PublicKey | Pda;
   marketplace: PublicKey | Pda;
   sbidMint: PublicKey | Pda;
   userSbidAta?: PublicKey | Pda;
@@ -94,33 +95,38 @@ export function mintBidToken(
       value: input.admin ?? null,
     },
     user: { index: 1, isWritable: true as boolean, value: input.user ?? null },
-    marketplace: {
+    userAccount: {
       index: 2,
+      isWritable: true as boolean,
+      value: input.userAccount ?? null,
+    },
+    marketplace: {
+      index: 3,
       isWritable: false as boolean,
       value: input.marketplace ?? null,
     },
     sbidMint: {
-      index: 3,
+      index: 4,
       isWritable: true as boolean,
       value: input.sbidMint ?? null,
     },
     userSbidAta: {
-      index: 4,
+      index: 5,
       isWritable: true as boolean,
       value: input.userSbidAta ?? null,
     },
     systemProgram: {
-      index: 5,
+      index: 6,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },
     tokenProgram: {
-      index: 6,
+      index: 7,
       isWritable: false as boolean,
       value: input.tokenProgram ?? null,
     },
     associatedTokenProgram: {
-      index: 7,
+      index: 8,
       isWritable: false as boolean,
       value: input.associatedTokenProgram ?? null,
     },
@@ -130,6 +136,17 @@ export function mintBidToken(
   const resolvedArgs: MintBidTokenInstructionArgs = { ...input };
 
   // Default values.
+  if (!resolvedAccounts.userAccount.value) {
+    resolvedAccounts.userAccount.value = context.eddsa.findPda(programId, [
+      bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.marketplace.value)
+      ),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.user.value)
+      ),
+    ]);
+  }
   if (!resolvedAccounts.userSbidAta.value) {
     resolvedAccounts.userSbidAta.value = context.eddsa.findPda(programId, [
       publicKeySerializer().serialize(

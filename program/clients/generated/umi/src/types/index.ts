@@ -11,5 +11,4 @@ export * from './listingCreated';
 export * from './listingDelisted';
 export * from './listingEnded';
 export * from './marketplaceInitialized';
-export * from './userAccount';
 export * from './userCreated';

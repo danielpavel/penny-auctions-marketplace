@@ -34,6 +34,7 @@ import {
 export type ListInstructionAccounts = {
   seller: Signer;
   admin: Signer;
+  userAccount?: PublicKey | Pda;
   listing?: PublicKey | Pda;
   marketplace: PublicKey | Pda;
   mint: PublicKey | Pda;
@@ -122,64 +123,69 @@ export function list(
       isWritable: false as boolean,
       value: input.admin ?? null,
     },
-    listing: {
+    userAccount: {
       index: 2,
+      isWritable: true as boolean,
+      value: input.userAccount ?? null,
+    },
+    listing: {
+      index: 3,
       isWritable: true as boolean,
       value: input.listing ?? null,
     },
     marketplace: {
-      index: 3,
+      index: 4,
       isWritable: true as boolean,
       value: input.marketplace ?? null,
     },
-    mint: { index: 4, isWritable: false as boolean, value: input.mint ?? null },
+    mint: { index: 5, isWritable: false as boolean, value: input.mint ?? null },
     collection: {
-      index: 5,
+      index: 6,
       isWritable: false as boolean,
       value: input.collection ?? null,
     },
     sellerAta: {
-      index: 6,
+      index: 7,
       isWritable: true as boolean,
       value: input.sellerAta ?? null,
     },
     escrow: {
-      index: 7,
+      index: 8,
       isWritable: true as boolean,
       value: input.escrow ?? null,
     },
     metadata: {
-      index: 8,
+      index: 9,
       isWritable: true as boolean,
       value: input.metadata ?? null,
     },
     masterEdition: {
-      index: 9,
+      index: 10,
       isWritable: false as boolean,
       value: input.masterEdition ?? null,
     },
     associatedTokenProgram: {
-      index: 10,
+      index: 11,
       isWritable: false as boolean,
       value: input.associatedTokenProgram ?? null,
     },
     systemProgram: {
-      index: 11,
+      index: 12,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },
     tokenProgram: {
-      index: 12,
+      index: 13,
       isWritable: false as boolean,
       value: input.tokenProgram ?? null,
     },
     metadataProgram: {
-      index: 13,
+      index: 14,
       isWritable: false as boolean,
       value: input.metadataProgram ?? null,
     },
     sysvarInstructions: {
-      index: 14,
+      index: 15,
       isWritable: false as boolean,
       value: input.sysvarInstructions ?? null,
     },
@@ -189,6 +195,17 @@ export function list(
   const resolvedArgs: ListInstructionArgs = { ...input };
 
   // Default values.
+  if (!resolvedAccounts.userAccount.value) {
+    resolvedAccounts.userAccount.value = context.eddsa.findPda(programId, [
+      bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.marketplace.value)
+      ),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.seller.value)
+      ),
+    ]);
+  }
   if (!resolvedAccounts.listing.value) {
     resolvedAccounts.listing.value = context.eddsa.findPda(programId, [
       bytes().serialize(new Uint8Array([108, 105, 115, 116, 105, 110, 103])),

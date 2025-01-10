@@ -8,3 +8,4 @@
 
 export * from './listingV2';
 export * from './marketplace';
+export * from './userAccount';
