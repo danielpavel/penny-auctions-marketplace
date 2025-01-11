@@ -18,10 +18,17 @@ use anchor_spl::{
 
 use solana_program::program::invoke_signed;
 
-use crate::state::Marketplace;
 use crate::{
-    constants::MARKET_INITIALIZED_LABEL, errors::MarketplaceErrorCode,
+    constants::{
+        MARKET_INITIALIZED_LABEL, MINT_AMOUNT_TIER_1, MINT_AMOUNT_TIER_2, MINT_AMOUNT_TIER_3,
+        MINT_COST_TIER_2, MINT_COST_TIER_3, MINT_TIER_2_BONUS, MINT_TIER_3_BONUS,
+    },
+    errors::MarketplaceErrorCode,
     events::MarketplaceInitialized,
+};
+use crate::{
+    constants::{MINT_COST_TIER_1, MINT_TIER_1_BONUS},
+    state::{Marketplace, MintCostTier, MintTier},
 };
 
 #[derive(Accounts)]
@@ -64,12 +71,34 @@ impl<'info> Initialize<'info> {
             MarketplaceErrorCode::MarketplaceNameTooLong
         );
 
+        let mint_tiers = [
+            MintTier {
+                tier: MintCostTier::Tier1,
+                amount: MINT_AMOUNT_TIER_1,
+                cost: MINT_COST_TIER_1,
+                bonus: MINT_TIER_1_BONUS,
+            },
+            MintTier {
+                tier: MintCostTier::Tier2,
+                amount: MINT_AMOUNT_TIER_2,
+                cost: MINT_COST_TIER_2,
+                bonus: MINT_TIER_2_BONUS,
+            },
+            MintTier {
+                tier: MintCostTier::Tier3,
+                amount: MINT_AMOUNT_TIER_3,
+                cost: MINT_COST_TIER_3,
+                bonus: MINT_TIER_3_BONUS,
+            },
+        ];
+
         let inner = Marketplace {
             admin: self.admin.key(),
             sbid_mint: self.sbid_mint.key(),
             treasury: self.treasury.key(),
             fee,
             name,
+            mint_tiers,
             bump: bumps.marketplace,
             treasury_bump: bumps.treasury,
         };

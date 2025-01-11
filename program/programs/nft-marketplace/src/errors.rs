@@ -35,4 +35,10 @@ pub enum MarketplaceErrorCode {
 
     #[msg("Invalid authority! Only marketplace admin can create / end a listing")]
     InvalidListingAuthority,
+
+    #[msg("User has already claimed tokens")]
+    AlreadyClaimed,
+
+    #[msg("Invalid mint const")]
+    InvalidMintCost,
 }

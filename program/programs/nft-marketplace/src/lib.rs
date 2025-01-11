@@ -10,10 +10,13 @@ pub mod state;
 pub mod transfer;
 pub mod utils;
 
+use state::MintCostTier;
+
 pub use contexts::*;
 
 #[program]
 pub mod nft_marketplace {
+
     use super::*;
 
     pub fn initialize(
@@ -94,8 +97,8 @@ pub mod nft_marketplace {
         Ok(())
     }
 
-    pub fn mint_bid_token(ctx: Context<MintBidToken>, amount: u64) -> Result<()> {
-        ctx.accounts.mint_token(amount)?;
+    pub fn mint_bid_token(ctx: Context<MintBidToken>, tier: MintCostTier) -> Result<()> {
+        ctx.accounts.mint_token(tier)?;
         ctx.accounts.reward_user(ctx.bumps.user_account)?;
 
         Ok(())

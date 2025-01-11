@@ -1,4 +1,7 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    prelude::*,
+    system_program::{transfer, Transfer},
+};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{mint_to, Mint, MintTo, TokenAccount, TokenInterface},
@@ -6,7 +9,8 @@ use anchor_spl::{
 
 use crate::{
     constants::REWARD_TIER_1,
-    state::{Marketplace, UserAccount},
+    state::{Marketplace, MintCostTier, UserAccount},
+    utils::{assert_valid_mint_tier_costs, get_mint_tier},
 };
 
 #[derive(Accounts)]
@@ -36,6 +40,12 @@ pub struct MintBidToken<'info> {
     )]
     marketplace: Box<Account<'info, Marketplace>>,
 
+    #[account(
+        seeds = [b"treasury", marketplace.key().as_ref()],
+        bump,
+    )]
+    pub treasury: SystemAccount<'info>,
+
     #[account(mut)]
     pub sbid_mint: Box<InterfaceAccount<'info, Mint>>,
 
@@ -53,7 +63,20 @@ pub struct MintBidToken<'info> {
 }
 
 impl<'info> MintBidToken<'info> {
-    pub fn mint_token(&mut self, amount: u64) -> Result<()> {
+    pub fn mint_token(&mut self, tier: MintCostTier) -> Result<()> {
+        assert_valid_mint_tier_costs(tier)?;
+
+        let mint_tier = get_mint_tier(&self.marketplace.mint_tiers, tier);
+
+        let transfer_accounts = Transfer {
+            from: self.user.to_account_info(),
+            to: self.treasury.to_account_info(),
+        };
+
+        let cpi_context = CpiContext::new(self.system_program.to_account_info(), transfer_accounts);
+
+        transfer(cpi_context, mint_tier.cost)?;
+
         let bump = [self.marketplace.bump];
         let signer_seeds: [&[&[u8]]; 1] = [&[
             b"marketplace",
@@ -74,6 +97,11 @@ impl<'info> MintBidToken<'info> {
             accounts,
             &signer_seeds,
         );
+
+        let amount = mint_tier
+            .amount
+            .checked_add(mint_tier.bonus)
+            .ok_or(ProgramError::ArithmeticOverflow)?;
 
         mint_to(cpi_context, amount)
     }

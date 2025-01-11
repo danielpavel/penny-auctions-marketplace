@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use solana_program::{program::invoke, system_instruction};
 
 pub use crate::errors::MarketplaceErrorCode;
-use crate::state::ListingV2;
+use crate::state::{ListingV2, MintCostTier, MintTier};
 
 pub fn assert_correct_highest_bidder_and_bid(
     listing: &Account<ListingV2>,
@@ -76,6 +76,20 @@ pub fn assert_auction_delist_eligible(listing: &Account<ListingV2>) -> Result<()
     }
 
     Ok(())
+}
+
+pub fn assert_valid_mint_tier_costs(tier: MintCostTier) -> Result<()> {
+    match tier {
+        MintCostTier::Tier1 | MintCostTier::Tier2 | MintCostTier::Tier3 => Ok(()),
+        _ => Err(MarketplaceErrorCode::InvalidMintCost.into()),
+    }
+}
+
+pub fn get_mint_tier(tiers: &[MintTier], tier: MintCostTier) -> &MintTier {
+    tiers
+        .iter()
+        .find(|mint_tier| mint_tier.tier == tier)
+        .expect("Tier must exist")
 }
 
 pub fn transfer_sol<'a>(
