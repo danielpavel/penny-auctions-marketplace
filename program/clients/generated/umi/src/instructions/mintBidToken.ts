@@ -112,7 +112,7 @@ export function mintBidToken(
     },
     treasury: {
       index: 4,
-      isWritable: false as boolean,
+      isWritable: true as boolean,
       value: input.treasury ?? null,
     },
     sbidMint: {

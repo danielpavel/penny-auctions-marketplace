@@ -10,7 +10,7 @@ pub mod state;
 pub mod transfer;
 pub mod utils;
 
-use state::MintCostTier;
+use state::{MintCostTier, MintTier};
 
 pub use contexts::*;
 
@@ -26,8 +26,10 @@ pub mod nft_marketplace {
         token_name: String,
         token_symbol: String,
         uri: String,
+        mint_costs: [MintTier; 3],
     ) -> Result<()> {
-        ctx.accounts.initialize_marketplace(name, fee, &ctx.bumps)?;
+        ctx.accounts
+            .initialize_marketplace(name, fee, mint_costs, &ctx.bumps)?;
         ctx.accounts
             .initialize_non_transferable_mint(token_name, token_symbol, uri)
     }

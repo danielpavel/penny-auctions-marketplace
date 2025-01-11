@@ -21,6 +21,7 @@ import {
   initialize,
   list,
   mintBidToken,
+  MintCostTier,
   placeBid,
 } from "../clients/generated/umi/src/";
 import { fetchToken } from "@metaplex-foundation/mpl-toolbox";
@@ -49,6 +50,7 @@ import {
   string,
   publicKey as publicKeySerializer,
 } from "@metaplex-foundation/umi/serializers";
+import { MINT_TIER_COSTS } from "./utils/constants";
 
 const options: TransactionBuilderSendAndConfirmOptions = {
   send: { skipPreflight: false },
@@ -200,6 +202,7 @@ describe("nft-marketplace", () => {
         tokenName,
         tokenSymbol,
         uri: tokenUri,
+        mintCosts: MINT_TIER_COSTS,
       }).sendAndConfirm(umi, options);
 
       const marketplaceAccount = await fetchMarketplace(
@@ -374,7 +377,6 @@ describe("nft-marketplace", () => {
             publicKeySerializer().serialize(userSigner.publicKey),
           ]);
 
-          const amount = 199 * 10 ** 6;
           const txResult = await mintBidToken(umi, {
             admin,
             userAccount,
@@ -383,7 +385,7 @@ describe("nft-marketplace", () => {
             sbidMint: fromWeb3JsPublicKey(sBidMint.publicKey),
             userSbidAta: fromWeb3JsPublicKey(ata),
             tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
-            amount: BigInt(amount),
+            tier: MintCostTier.Tier3,
           }).sendAndConfirm(umi, options);
 
           if (txResult.result.value.err) {
@@ -391,7 +393,10 @@ describe("nft-marketplace", () => {
           }
 
           const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
-          expect(ta.amount).to.eq(BigInt(199 * 10 ** 6));
+          const expectedAmount =
+            MINT_TIER_COSTS[MintCostTier.Tier3].amount +
+            MINT_TIER_COSTS[MintCostTier.Tier3].bonus;
+          expect(ta.amount).to.eq(expectedAmount);
 
           const user = await fetchUserAccount(umi, userAccount);
           expect(user.points).to.eq(
@@ -431,6 +436,8 @@ describe("nft-marketplace", () => {
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
 
+    const taOld = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+
     const userSigner = createSignerFromKeypair(
       umi,
       umi.eddsa.createKeypairFromSecretKey(user2.secretKey)
@@ -469,7 +476,7 @@ describe("nft-marketplace", () => {
     }
 
     const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
-    expect(ta.amount).to.equal(BigInt(198 * 10 ** 6));
+    expect(ta.amount).to.equal(taOld.amount - BigInt(10 ** 6));
 
     const listingAccountNew = await fetchListingV2(
       umi,
@@ -673,6 +680,8 @@ describe("nft-marketplace", () => {
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
 
+    const taOld = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+
     const userSigner = createSignerFromKeypair(
       umi,
       umi.eddsa.createKeypairFromSecretKey(user3.secretKey)
@@ -711,7 +720,7 @@ describe("nft-marketplace", () => {
     }
 
     const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
-    expect(ta.amount).to.equal(BigInt(198 * 10 ** 6));
+    expect(ta.amount).to.equal(taOld.amount - BigInt(10 ** 6));
 
     const listingAccountNew = await fetchListingV2(
       umi,
@@ -764,6 +773,17 @@ describe("nft-marketplace", () => {
     const editionAccount = findMasterEditionPda(umi, {
       mint: fromWeb3JsPublicKey(mint),
     })[0];
+
+    const [treasury] = umi.eddsa.findPda(programId, [
+      bytes().serialize(
+        new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121])
+      ),
+      publicKeySerializer().serialize(fromWeb3JsPublicKey(marketplace)),
+    ]);
+
+    const treasuryBalanceOld = await provider.connection.getBalance(
+      toWeb3JsPublicKey(treasury)
+    );
 
     await new Promise((resolve) => setTimeout(resolve, 40 * 1000));
 
@@ -818,19 +838,12 @@ describe("nft-marketplace", () => {
     );
     expect(user1NftAtaBalance.value.amount).to.equal("1");
 
-    const [treasury] = umi.eddsa.findPda(programId, [
-      bytes().serialize(
-        new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121])
-      ),
-      publicKeySerializer().serialize(fromWeb3JsPublicKey(marketplace)),
-    ]);
-
     // check treasury has received the current bid amount
-    const treasuryBalance = await provider.connection.getBalance(
+    const treasuryBalanceNew = await provider.connection.getBalance(
       toWeb3JsPublicKey(treasury)
     );
-    expect(treasuryBalance).to.equal(
-      Number(listingAccount.currentBid.toString())
+    expect(treasuryBalanceNew).to.equal(
+      treasuryBalanceOld + Number(listingAccount.currentBid)
     );
 
     const user = await fetchUserAccount(umi, userAccount);

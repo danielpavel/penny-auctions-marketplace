@@ -19,16 +19,10 @@ use anchor_spl::{
 use solana_program::program::invoke_signed;
 
 use crate::{
-    constants::{
-        MARKET_INITIALIZED_LABEL, MINT_AMOUNT_TIER_1, MINT_AMOUNT_TIER_2, MINT_AMOUNT_TIER_3,
-        MINT_COST_TIER_2, MINT_COST_TIER_3, MINT_TIER_2_BONUS, MINT_TIER_3_BONUS,
-    },
+    constants::MARKET_INITIALIZED_LABEL,
     errors::MarketplaceErrorCode,
     events::MarketplaceInitialized,
-};
-use crate::{
-    constants::{MINT_COST_TIER_1, MINT_TIER_1_BONUS},
-    state::{Marketplace, MintCostTier, MintTier},
+    state::{Marketplace, MintTier},
 };
 
 #[derive(Accounts)]
@@ -64,33 +58,13 @@ impl<'info> Initialize<'info> {
         &mut self,
         name: String,
         fee: u16,
+        mint_tiers: [MintTier; 3],
         bumps: &InitializeBumps,
     ) -> Result<()> {
         require!(
             name.len() > 0 && name.len() < 33,
             MarketplaceErrorCode::MarketplaceNameTooLong
         );
-
-        let mint_tiers = [
-            MintTier {
-                tier: MintCostTier::Tier1,
-                amount: MINT_AMOUNT_TIER_1,
-                cost: MINT_COST_TIER_1,
-                bonus: MINT_TIER_1_BONUS,
-            },
-            MintTier {
-                tier: MintCostTier::Tier2,
-                amount: MINT_AMOUNT_TIER_2,
-                cost: MINT_COST_TIER_2,
-                bonus: MINT_TIER_2_BONUS,
-            },
-            MintTier {
-                tier: MintCostTier::Tier3,
-                amount: MINT_AMOUNT_TIER_3,
-                cost: MINT_COST_TIER_3,
-                bonus: MINT_TIER_3_BONUS,
-            },
-        ];
 
         let inner = Marketplace {
             admin: self.admin.key(),

@@ -16,6 +16,7 @@ import {
 } from '@metaplex-foundation/umi';
 import {
   Serializer,
+  array,
   bytes,
   mapSerializer,
   publicKey as publicKeySerializer,
@@ -30,6 +31,7 @@ import {
   expectSome,
   getAccountMetasAndSigners,
 } from '../shared';
+import { MintTier, MintTierArgs, getMintTierSerializer } from '../types';
 
 // Accounts.
 export type InitializeInstructionAccounts = {
@@ -49,6 +51,7 @@ export type InitializeInstructionData = {
   tokenName: string;
   tokenSymbol: string;
   uri: string;
+  mintCosts: Array<MintTier>;
 };
 
 export type InitializeInstructionDataArgs = {
@@ -57,6 +60,7 @@ export type InitializeInstructionDataArgs = {
   tokenName: string;
   tokenSymbol: string;
   uri: string;
+  mintCosts: Array<MintTierArgs>;
 };
 
 export function getInitializeInstructionDataSerializer(): Serializer<
@@ -76,6 +80,7 @@ export function getInitializeInstructionDataSerializer(): Serializer<
         ['tokenName', string()],
         ['tokenSymbol', string()],
         ['uri', string()],
+        ['mintCosts', array(getMintTierSerializer(), { size: 3 })],
       ],
       { description: 'InitializeInstructionData' }
     ),

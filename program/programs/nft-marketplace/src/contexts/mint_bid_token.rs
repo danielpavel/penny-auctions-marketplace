@@ -41,6 +41,7 @@ pub struct MintBidToken<'info> {
     marketplace: Box<Account<'info, Marketplace>>,
 
     #[account(
+        mut,
         seeds = [b"treasury", marketplace.key().as_ref()],
         bump,
     )]
