@@ -27,17 +27,17 @@ pub struct MintBidToken<'info> {
         bump
         )
     ]
-    pub user_account: Account<'info, UserAccount>,
+    pub user_account: Box<Account<'info, UserAccount>>,
 
     #[account(
         has_one = sbid_mint,
         seeds = [b"marketplace", admin.key().as_ref(), sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
-    marketplace: Account<'info, Marketplace>,
+    marketplace: Box<Account<'info, Marketplace>>,
 
     #[account(mut)]
-    pub sbid_mint: InterfaceAccount<'info, Mint>,
+    pub sbid_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         init,
@@ -86,11 +86,8 @@ impl<'info> MintBidToken<'info> {
             .points
             .checked_add(REWARD_TIER_1)
             .ok_or(ProgramError::ArithmeticOverflow)?;
-        self.user_account.total_bids_placed = self
-            .user_account
-            .total_bids_placed
-            .checked_add(1)
-            .ok_or(ProgramError::ArithmeticOverflow)?;
+
+        msg!("[mint_bid_token][reward_user] {:?}", self.user_account);
 
         Ok(())
     }

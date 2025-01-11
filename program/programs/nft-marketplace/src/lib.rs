@@ -89,12 +89,15 @@ pub mod nft_marketplace {
         amount: u64,
     ) -> Result<()> {
         ctx.accounts.end_listing(amount, ctx.remaining_accounts)?;
-        ctx.accounts.reward_user(ctx.bumps.user_account)?;
+        ctx.accounts.reward_user()?;
 
         Ok(())
     }
 
     pub fn mint_bid_token(ctx: Context<MintBidToken>, amount: u64) -> Result<()> {
-        ctx.accounts.mint_token(amount)
+        ctx.accounts.mint_token(amount)?;
+        ctx.accounts.reward_user(ctx.bumps.user_account)?;
+
+        Ok(())
     }
 }

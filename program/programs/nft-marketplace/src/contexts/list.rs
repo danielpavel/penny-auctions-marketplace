@@ -38,7 +38,7 @@ pub struct List<'info> {
         bump
         )
     ]
-    pub user_account: Account<'info, UserAccount>,
+    pub user_account: Box<Account<'info, UserAccount>>,
 
     #[account(
         init,
@@ -56,15 +56,15 @@ pub struct List<'info> {
     )]
     marketplace: Box<Account<'info, Marketplace>>,
 
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub collection: InterfaceAccount<'info, Mint>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
+    pub collection: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(
         mut,
         associated_token::mint = mint,
         associated_token::authority = seller
     )]
-    pub seller_ata: InterfaceAccount<'info, TokenAccount>,
+    pub seller_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init,
@@ -72,7 +72,7 @@ pub struct List<'info> {
         associated_token::mint = mint,
         associated_token::authority = listing,
     )]
-    pub escrow: InterfaceAccount<'info, TokenAccount>,
+    pub escrow: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,

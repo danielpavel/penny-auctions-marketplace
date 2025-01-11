@@ -25,14 +25,12 @@ pub struct EndListing<'info> {
     admin: Signer<'info>,
 
     #[account(
-        init_if_needed,
-        payer = user,
-        space = 8 + UserAccount::INIT_SPACE,
+        mut,
         seeds = [b"user", marketplace.key().as_ref(), user.key().as_ref()],
-        bump
-        )
+        bump = user_account.bump
+    )
     ]
-    pub user_account: Account<'info, UserAccount>,
+    pub user_account: Box<Account<'info, UserAccount>>,
 
     #[account(
         mut,
@@ -92,7 +90,7 @@ pub struct EndListing<'info> {
         seeds = [b"marketplace", marketplace.admin.key().as_ref(), marketplace.sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
-    marketplace: Account<'info, Marketplace>,
+    marketplace: Box<Account<'info, Marketplace>>,
 
     #[account(
         mut,
@@ -189,9 +187,7 @@ impl<'info> EndListing<'info> {
         close_account(ctx)
     }
 
-    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
-        self.user_account.bump = bump;
-
+    pub fn reward_user(&mut self) -> Result<()> {
         self.user_account.points = self
             .user_account
             .points
@@ -199,7 +195,7 @@ impl<'info> EndListing<'info> {
             .ok_or(ProgramError::ArithmeticOverflow)?;
         self.user_account.total_auctions_won = self
             .user_account
-            .total_bids_placed
+            .total_auctions_won
             .checked_add(1)
             .ok_or(ProgramError::ArithmeticOverflow)?;
 

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct UserAccount {
     pub total_bids_placed: u32,
     pub total_auctions_participated: u32,
