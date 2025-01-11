@@ -105,4 +105,13 @@ pub mod nft_marketplace {
 
         Ok(())
     }
+
+    pub fn update_marketplace_mint_tiers(
+        ctx: Context<UpdateMarketplace>,
+        tiers: [MintTier; 3],
+    ) -> Result<()> {
+        ctx.accounts.update_mint_tiers(tiers)?;
+
+        Ok(())
+    }
 }
