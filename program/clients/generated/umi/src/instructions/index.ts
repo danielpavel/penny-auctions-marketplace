@@ -11,3 +11,4 @@ export * from './initialize';
 export * from './list';
 export * from './mintBidToken';
 export * from './placeBid';
+export * from './updateMarketplaceMintTiers';

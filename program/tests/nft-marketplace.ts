@@ -22,7 +22,9 @@ import {
   list,
   mintBidToken,
   MintCostTier,
+  MintTier,
   placeBid,
+  updateMarketplaceMintTiers,
 } from "../clients/generated/umi/src/";
 import { fetchToken } from "@metaplex-foundation/mpl-toolbox";
 
@@ -50,7 +52,7 @@ import {
   string,
   publicKey as publicKeySerializer,
 } from "@metaplex-foundation/umi/serializers";
-import { MINT_TIER_COSTS } from "./utils/constants";
+import { MINT_TIER_COSTS_DUMMY, MINT_TIER_COSTS } from "./utils/constants";
 
 const options: TransactionBuilderSendAndConfirmOptions = {
   send: { skipPreflight: false },
@@ -202,7 +204,7 @@ describe("nft-marketplace", () => {
         tokenName,
         tokenSymbol,
         uri: tokenUri,
-        mintCosts: MINT_TIER_COSTS,
+        mintCosts: MINT_TIER_COSTS_DUMMY,
       }).sendAndConfirm(umi, options);
 
       const marketplaceAccount = await fetchMarketplace(
@@ -216,9 +218,35 @@ describe("nft-marketplace", () => {
         sBidMint.publicKey.toString()
       );
       expect(marketplaceAccount.fee).to.be.equal(fee);
+
+      marketplaceAccount.mintTiers.map((tier: MintTier, index: number) => {
+        expect(tier).deep.equal(MINT_TIER_COSTS_DUMMY[index]);
+      });
     } catch (error) {
       console.error("Initialize Marketplace Error:", error);
       expect.fail("❌ Initialize Markeplace Tx Failed");
+    }
+  });
+
+  it("Update Mint Tiers", async () => {
+    try {
+      await updateMarketplaceMintTiers(umi, {
+        admin,
+        marketplace: fromWeb3JsPublicKey(marketplace),
+        tiers: MINT_TIER_COSTS,
+      }).sendAndConfirm(umi, options);
+
+      const marketplaceAccount = await fetchMarketplace(
+        umi,
+        fromWeb3JsPublicKey(marketplace)
+      );
+
+      marketplaceAccount.mintTiers.map((tier: MintTier, index: number) => {
+        expect(tier).deep.equal(MINT_TIER_COSTS[index]);
+      });
+    } catch (err) {
+      console.error("Update Mint Tiers Error:", err);
+      expect.fail("❌ Update Mint Tiers Tx Failed");
     }
   });
 
