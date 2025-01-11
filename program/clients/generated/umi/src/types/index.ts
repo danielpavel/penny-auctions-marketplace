@@ -11,4 +11,6 @@ export * from './listingCreated';
 export * from './listingDelisted';
 export * from './listingEnded';
 export * from './marketplaceInitialized';
+export * from './mintCostTier';
+export * from './mintTier';
 export * from './userCreated';

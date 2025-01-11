@@ -20,7 +20,6 @@ import {
   mapSerializer,
   publicKey as publicKeySerializer,
   struct,
-  u64,
 } from '@metaplex-foundation/umi/serializers';
 import {
   ResolvedAccount,
@@ -28,6 +27,11 @@ import {
   expectPublicKey,
   getAccountMetasAndSigners,
 } from '../shared';
+import {
+  MintCostTier,
+  MintCostTierArgs,
+  getMintCostTierSerializer,
+} from '../types';
 
 // Accounts.
 export type MintBidTokenInstructionAccounts = {
@@ -35,6 +39,7 @@ export type MintBidTokenInstructionAccounts = {
   user: Signer;
   userAccount?: PublicKey | Pda;
   marketplace: PublicKey | Pda;
+  treasury?: PublicKey | Pda;
   sbidMint: PublicKey | Pda;
   userSbidAta?: PublicKey | Pda;
   systemProgram?: PublicKey | Pda;
@@ -45,10 +50,10 @@ export type MintBidTokenInstructionAccounts = {
 // Data.
 export type MintBidTokenInstructionData = {
   discriminator: Uint8Array;
-  amount: bigint;
+  tier: MintCostTier;
 };
 
-export type MintBidTokenInstructionDataArgs = { amount: number | bigint };
+export type MintBidTokenInstructionDataArgs = { tier: MintCostTierArgs };
 
 export function getMintBidTokenInstructionDataSerializer(): Serializer<
   MintBidTokenInstructionDataArgs,
@@ -62,7 +67,7 @@ export function getMintBidTokenInstructionDataSerializer(): Serializer<
     struct<MintBidTokenInstructionData>(
       [
         ['discriminator', bytes({ size: 8 })],
-        ['amount', u64()],
+        ['tier', getMintCostTierSerializer()],
       ],
       { description: 'MintBidTokenInstructionData' }
     ),
@@ -105,28 +110,33 @@ export function mintBidToken(
       isWritable: false as boolean,
       value: input.marketplace ?? null,
     },
-    sbidMint: {
+    treasury: {
       index: 4,
+      isWritable: false as boolean,
+      value: input.treasury ?? null,
+    },
+    sbidMint: {
+      index: 5,
       isWritable: true as boolean,
       value: input.sbidMint ?? null,
     },
     userSbidAta: {
-      index: 5,
+      index: 6,
       isWritable: true as boolean,
       value: input.userSbidAta ?? null,
     },
     systemProgram: {
-      index: 6,
+      index: 7,
       isWritable: false as boolean,
       value: input.systemProgram ?? null,
     },
     tokenProgram: {
-      index: 7,
+      index: 8,
       isWritable: false as boolean,
       value: input.tokenProgram ?? null,
     },
     associatedTokenProgram: {
-      index: 8,
+      index: 9,
       isWritable: false as boolean,
       value: input.associatedTokenProgram ?? null,
     },
@@ -144,6 +154,16 @@ export function mintBidToken(
       ),
       publicKeySerializer().serialize(
         expectPublicKey(resolvedAccounts.user.value)
+      ),
+    ]);
+  }
+  if (!resolvedAccounts.treasury.value) {
+    resolvedAccounts.treasury.value = context.eddsa.findPda(programId, [
+      bytes().serialize(
+        new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121])
+      ),
+      publicKeySerializer().serialize(
+        expectPublicKey(resolvedAccounts.marketplace.value)
       ),
     ]);
   }

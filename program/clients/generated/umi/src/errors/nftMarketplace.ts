@@ -214,6 +214,32 @@ export class InvalidListingAuthorityError extends ProgramError {
 codeToErrorMap.set(0x177d, InvalidListingAuthorityError);
 nameToErrorMap.set('InvalidListingAuthority', InvalidListingAuthorityError);
 
+/** AlreadyClaimed: User has already claimed tokens */
+export class AlreadyClaimedError extends ProgramError {
+  override readonly name: string = 'AlreadyClaimed';
+
+  readonly code: number = 0x177e; // 6014
+
+  constructor(program: Program, cause?: Error) {
+    super('User has already claimed tokens', program, cause);
+  }
+}
+codeToErrorMap.set(0x177e, AlreadyClaimedError);
+nameToErrorMap.set('AlreadyClaimed', AlreadyClaimedError);
+
+/** InvalidMintCost: Invalid mint const */
+export class InvalidMintCostError extends ProgramError {
+  override readonly name: string = 'InvalidMintCost';
+
+  readonly code: number = 0x177f; // 6015
+
+  constructor(program: Program, cause?: Error) {
+    super('Invalid mint const', program, cause);
+  }
+}
+codeToErrorMap.set(0x177f, InvalidMintCostError);
+nameToErrorMap.set('InvalidMintCost', InvalidMintCostError);
+
 /**
  * Attempts to resolve a custom program error from the provided error code.
  * @category Errors

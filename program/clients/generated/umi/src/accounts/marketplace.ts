@@ -21,6 +21,7 @@ import {
 } from '@metaplex-foundation/umi';
 import {
   Serializer,
+  array,
   bytes,
   mapSerializer,
   publicKey as publicKeySerializer,
@@ -29,6 +30,7 @@ import {
   u16,
   u8,
 } from '@metaplex-foundation/umi/serializers';
+import { MintTier, MintTierArgs, getMintTierSerializer } from '../types';
 
 export type Marketplace = Account<MarketplaceAccountData>;
 
@@ -39,6 +41,7 @@ export type MarketplaceAccountData = {
   treasury: PublicKey;
   fee: number;
   name: string;
+  mintTiers: Array<MintTier>;
   bump: number;
   treasuryBump: number;
 };
@@ -49,6 +52,7 @@ export type MarketplaceAccountDataArgs = {
   treasury: PublicKey;
   fee: number;
   name: string;
+  mintTiers: Array<MintTierArgs>;
   bump: number;
   treasuryBump: number;
 };
@@ -66,6 +70,7 @@ export function getMarketplaceAccountDataSerializer(): Serializer<
         ['treasury', publicKeySerializer()],
         ['fee', u16()],
         ['name', string()],
+        ['mintTiers', array(getMintTierSerializer(), { size: 3 })],
         ['bump', u8()],
         ['treasuryBump', u8()],
       ],
@@ -151,6 +156,7 @@ export function getMarketplaceGpaBuilder(
       treasury: PublicKey;
       fee: number;
       name: string;
+      mintTiers: Array<MintTierArgs>;
       bump: number;
       treasuryBump: number;
     }>({
@@ -160,6 +166,7 @@ export function getMarketplaceGpaBuilder(
       treasury: [72, publicKeySerializer()],
       fee: [104, u16()],
       name: [106, string()],
+      mintTiers: [null, array(getMintTierSerializer(), { size: 3 })],
       bump: [null, u8()],
       treasuryBump: [null, u8()],
     })
