@@ -1040,6 +1040,95 @@ describe("nft-marketplace", () => {
     expect(escrowAccount.value.amount).to.equal("1");
   });
 
+  it("User 2 place a bid to pNft Listing", async () => {
+    const mint = pNft.mint;
+    const seed = seedPnftListing;
+    const [listing] = PublicKey.findProgramAddressSync(
+      [
+        anchor.utils.bytes.utf8.encode("listing"),
+        marketplace.toBuffer(),
+        mint.toBuffer(),
+        seed.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
+
+    const listingAccountOld = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    const [ata] = PublicKey.findProgramAddressSync(
+      [
+        user2.publicKey.toBytes(),
+        TOKEN_2022_PROGRAM_ID.toBytes(),
+        sBidMint.publicKey.toBytes(),
+      ],
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const taOld = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+
+    const userSigner = createSignerFromKeypair(
+      umi,
+      umi.eddsa.createKeypairFromSecretKey(user2.secretKey)
+    );
+    const sbidMintPubkey = fromWeb3JsPublicKey(sBidMint.publicKey);
+
+    const [userAccount] = umi.eddsa.findPda(programId, [
+      bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+      publicKeySerializer().serialize(fromWeb3JsPublicKey(marketplace)),
+      publicKeySerializer().serialize(userSigner.publicKey),
+    ]);
+
+    try {
+      await placeBid(umi, {
+        bidder: userSigner,
+        sbidMint: sbidMintPubkey,
+        userAccount,
+        bidderSbidAta: fromWeb3JsPublicKey(ata),
+        mint: fromWeb3JsPublicKey(mint),
+        listing: fromWeb3JsPublicKey(listing),
+        marketplace: fromWeb3JsPublicKey(marketplace),
+        tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+        highestBidder: listingAccountOld.highestBidder,
+        currentBid: listingAccountOld.currentBid,
+      }).sendAndConfirm(umi, options);
+    } catch (err) {
+      const { errorNumber, errorCode, errorMessage } = parseAnchorError(
+        err.transactionLogs
+      );
+
+      console.error("errorNumber", errorNumber);
+      console.error("errorCode", errorCode);
+      console.error("errorMessage", errorMessage);
+
+      expect.fail("❌ Place Bid tx failed!");
+    }
+
+    const ta = await fetchToken(umi, fromWeb3JsPublicKey(ata));
+    expect(ta.amount).to.equal(taOld.amount - BigInt(10 ** 6));
+
+    const listingAccountNew = await fetchListingV2(
+      umi,
+      fromWeb3JsPublicKey(listing)
+    );
+
+    expect(listingAccountNew.highestBidder.toString()).to.equal(
+      userSigner.publicKey.toString()
+    );
+    expect(listingAccountNew.currentBid).to.equal(
+      BigInt(2) * listingAccountNew.bidIncrement
+    );
+    expect(listingAccountNew.endTimeInSlots).to.equal(
+      listingAccountOld.endTimeInSlots + listingAccountOld.timerExtensionInSlots
+    );
+
+    const user = await fetchUserAccount(umi, userAccount);
+    expect(user.points).to.eq(2);
+    expect(user.totalBidsPlaced).to.eq(1);
+  });
+
   // it("Bid pNFT", async () => {
   //   const [listing] = anchor.web3.PublicKey.findProgramAddressSync(
   //     [
