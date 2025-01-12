@@ -1,4 +1,9 @@
 import { BN, web3 } from "@coral-xyz/anchor";
+import { Umi, PublicKey } from "@metaplex-foundation/umi";
+import {
+  bytes,
+  publicKey as publicKeySerializer,
+} from "@metaplex-foundation/umi/serializers";
 
 export function generateRandomU64Seed(): BN {
   const randomBytes = web3.Keypair.generate().secretKey.slice(0, 8);
@@ -38,4 +43,17 @@ export function parseAnchorError(logs: string[]) {
   }
 
   return error;
+}
+
+export function fetchUserAccountPDA(
+  umi: Umi,
+  programId: PublicKey,
+  marketplace: PublicKey,
+  user: PublicKey
+) {
+  return umi.eddsa.findPda(programId, [
+    bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+    publicKeySerializer().serialize(marketplace),
+    publicKeySerializer().serialize(user),
+  ]);
 }
