@@ -23,6 +23,7 @@ import {
   Serializer,
   bytes,
   mapSerializer,
+  publicKey as publicKeySerializer,
   struct,
   u32,
   u8,
@@ -32,6 +33,7 @@ export type UserAccount = Account<UserAccountAccountData>;
 
 export type UserAccountAccountData = {
   discriminator: Uint8Array;
+  owner: PublicKey;
   totalBidsPlaced: number;
   totalAuctionsParticipated: number;
   totalAuctionsWon: number;
@@ -41,6 +43,7 @@ export type UserAccountAccountData = {
 };
 
 export type UserAccountAccountDataArgs = {
+  owner: PublicKey;
   totalBidsPlaced: number;
   totalAuctionsParticipated: number;
   totalAuctionsWon: number;
@@ -57,6 +60,7 @@ export function getUserAccountAccountDataSerializer(): Serializer<
     struct<UserAccountAccountData>(
       [
         ['discriminator', bytes({ size: 8 })],
+        ['owner', publicKeySerializer()],
         ['totalBidsPlaced', u32()],
         ['totalAuctionsParticipated', u32()],
         ['totalAuctionsWon', u32()],
@@ -141,6 +145,7 @@ export function getUserAccountGpaBuilder(
   return gpaBuilder(context, programId)
     .registerFields<{
       discriminator: Uint8Array;
+      owner: PublicKey;
       totalBidsPlaced: number;
       totalAuctionsParticipated: number;
       totalAuctionsWon: number;
@@ -149,12 +154,13 @@ export function getUserAccountGpaBuilder(
       bump: number;
     }>({
       discriminator: [0, bytes({ size: 8 })],
-      totalBidsPlaced: [8, u32()],
-      totalAuctionsParticipated: [12, u32()],
-      totalAuctionsWon: [16, u32()],
-      totalAuctionsCreated: [20, u32()],
-      points: [24, u32()],
-      bump: [28, u8()],
+      owner: [8, publicKeySerializer()],
+      totalBidsPlaced: [40, u32()],
+      totalAuctionsParticipated: [44, u32()],
+      totalAuctionsWon: [48, u32()],
+      totalAuctionsCreated: [52, u32()],
+      points: [56, u32()],
+      bump: [60, u8()],
     })
     .deserializeUsing<UserAccount>((account) => deserializeUserAccount(account))
     .whereField(

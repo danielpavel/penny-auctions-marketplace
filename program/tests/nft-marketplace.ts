@@ -108,10 +108,7 @@ describe("nft-marketplace", () => {
   let marketplacePDA: Pda;
   let marketplace: PublicKey;
 
-  let treasury: anchor.web3.PublicKey;
-
   let sBidMint = anchor.web3.Keypair.generate();
-  let sBidVault: anchor.web3.PublicKey;
 
   let seed = generateRandomU64Seed();
   let seedPnftListing = generateRandomU64Seed();
@@ -340,6 +337,7 @@ describe("nft-marketplace", () => {
 
       expect(user.totalAuctionsCreated).to.eq(1);
       expect(user.points).to.eq(10);
+      expect(user.owner).to.eq(sellerSigner.publicKey);
 
       const listingAccount = await fetchListingV2(
         umi,
@@ -525,6 +523,7 @@ describe("nft-marketplace", () => {
     const user = await fetchUserAccount(umi, userAccount);
     expect(user.points).to.eq(2);
     expect(user.totalBidsPlaced).to.eq(1);
+    expect(user.owner).to.eq(userSigner.publicKey);
   });
 
   it("User 2 place a bid again - should fail!", async () => {
@@ -769,6 +768,7 @@ describe("nft-marketplace", () => {
     const user = await fetchUserAccount(umi, userAccount);
     expect(user.points).to.eq(2);
     expect(user.totalBidsPlaced).to.eq(1);
+    expect(user.owner).to.eq(userSigner.publicKey);
   });
 
   it("User 3 Ends Auction", async () => {
@@ -998,6 +998,7 @@ describe("nft-marketplace", () => {
 
     expect(user.totalAuctionsCreated).to.eq(1);
     expect(user.points).to.eq(10);
+    expect(user.owner).to.eq(initializerSigner.publicKey);
 
     const listingAccount = await fetchListingV2(
       umi,
@@ -1122,6 +1123,7 @@ describe("nft-marketplace", () => {
     const user = await fetchUserAccount(umi, userAccount);
     expect(user.points).to.eq(3);
     expect(user.totalBidsPlaced).to.eq(2);
+    expect(user.owner).to.eq(userSigner.publicKey);
   });
 
   it("User 2 Ends pNFT Listing Auction", async () => {
