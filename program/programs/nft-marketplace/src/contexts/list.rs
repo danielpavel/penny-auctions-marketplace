@@ -242,6 +242,7 @@ impl<'info> List<'info> {
 
     pub fn reward_user(&mut self, bump: u8) -> Result<()> {
         self.user_account.bump = bump;
+        self.user_account.owner = self.seller.key();
 
         self.user_account.points = self
             .user_account

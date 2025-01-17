@@ -33,6 +33,7 @@ pub struct InitializeUser<'info> {
 impl<'info> InitializeUser<'info> {
     pub fn initialize_user(&mut self, bumps: &InitializeUserBumps) -> Result<()> {
         self.user_account.set_inner(UserAccount {
+            owner: self.user.key(),
             total_bids_placed: 0,
             total_auctions_participated: 0,
             total_auctions_won: 0,
