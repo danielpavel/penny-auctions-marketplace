@@ -1,45 +1,39 @@
 import { program as commander } from "commander";
-import { PublicKey } from "@solana/web3.js";
 
-import { initializeUmi, mintBidTokens, setClusterConfig } from "./scripts";
+import { initializePrereqs, intializeMarketplace } from "./scripts";
+import { InitializeInstructionArgs } from "../clients/generated/umi/src";
+
+import fs from "fs";
+import { TransactionBuilderSendAndConfirmOptions } from "@metaplex-foundation/umi";
+
+const opts: TransactionBuilderSendAndConfirmOptions = {
+  send: { skipPreflight: false },
+  confirm: { commitment: "confirmed" },
+};
 
 commander.version("0.1.0").description("CLI for testing Penny Auction program");
 
-// commander
-//   .command("init")
-//   .description("Initialize Marketplace")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-k, --keypair <path>", "Path to keypair file")
-//   .option("-r, --rpc <url>", "RPC URL")
-//   .action(async (options) => {
-//     const { cluster, keypair, rpc } = options;
-//     console.log("Solana Cluster:", typeof cluster);
-//     console.log("Keypair Path:", keypair);
-//     console.log("RPC URL:", rpc);
-//
-//     try {
-//       if (
-//         !cluster ||
-//         !["localhost", "devnet", "mainnet-beta"].includes(cluster)
-//       ) {
-//         throw new Error(
-//           "Invalid cluster. Use `localhost`, `devnet` or `mainnet-beta`"
-//         );
-//       }
-//
-//       await setClusterConfig(cluster, keypair, rpc);
-//
-//       initializeUmi();
-//
-//       await initBidTokenMint();
-//       await initTestNftCollection();
-//
-//       await initProject();
-//     } catch (err) {
-//       console.error("Error initializing project:", err);
-//     }
-//   });
-//
+commander
+  .command("initialize")
+  .description("Initialize Markeplace")
+  .requiredOption("-a, --admin <pubkey>", "Admin wallet")
+  .requiredOption("-c, --config <json>", "Initialize Configuration JSON")
+  .action(async (options) => {
+    try {
+      const { umi, program, admin } = await initializePrereqs(
+        "devnet",
+        "./wallets/admin.json"
+      );
+
+      const configFile = fs.readFileSync(options.config, "utf-8");
+      const args: InitializeInstructionArgs = JSON.parse(configFile);
+
+      await intializeMarketplace(umi, program, admin, args, opts);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  });
+
 // commander
 //   .command("mint-nft")
 //   .description("Mint a new test NFT")
@@ -257,32 +251,32 @@ commander.version("0.1.0").description("CLI for testing Penny Auction program");
 //     }
 //   });
 
-commander
-  .command("mint-bid-token")
-  .description("Mine bid tokens")
-  .option("-a --amount <number>", "Address of the receiver wallet")
-  .option("-r --receiver <address>", "Address of the receiver wallet")
-  .option("-c, --cluster <value>", "Solana Cluster")
-  .option("-k, --keypair <path>", "Path to keypair file")
-  .option("-m, --mint <value>", "Mint of the bid token")
-  .action(async (options) => {
-    try {
-      const { cluster, keypair, receiver, amount, mint } = options;
-
-      console.log("Amount:", amount);
-      console.log("To:", receiver);
-      console.log("Cluster:", cluster);
-      console.log("Keypair:", keypair);
-
-      const to = new PublicKey(receiver);
-
-      await setClusterConfig(cluster, keypair);
-      initializeUmi();
-
-      await mintBidTokens(amount, to, new PublicKey(mint));
-    } catch (error) {
-      console.error("Error fetching marketplace info:", error);
-    }
-  });
+// commander
+//   .command("mint-bid-token")
+//   .description("Mine bid tokens")
+//   .option("-a --amount <number>", "Address of the receiver wallet")
+//   .option("-r --receiver <address>", "Address of the receiver wallet")
+//   .option("-c, --cluster <value>", "Solana Cluster")
+//   .option("-k, --keypair <path>", "Path to keypair file")
+//   .option("-m, --mint <value>", "Mint of the bid token")
+//   .action(async (options) => {
+//     try {
+//       const { cluster, keypair, receiver, amount, mint } = options;
+//
+//       console.log("Amount:", amount);
+//       console.log("To:", receiver);
+//       console.log("Cluster:", cluster);
+//       console.log("Keypair:", keypair);
+//
+//       const to = new PublicKey(receiver);
+//
+//       await setClusterConfig(cluster, keypair);
+//       initializeUmi();
+//
+//       await mintBidTokens(amount, to, new PublicKey(mint));
+//     } catch (error) {
+//       console.error("Error fetching marketplace info:", error);
+//     }
+//   });
 
 commander.parse(process.argv);
