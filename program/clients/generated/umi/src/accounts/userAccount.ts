@@ -21,6 +21,7 @@ import {
 } from '@metaplex-foundation/umi';
 import {
   Serializer,
+  array,
   bytes,
   mapSerializer,
   publicKey as publicKeySerializer,
@@ -40,6 +41,8 @@ export type UserAccountAccountData = {
   totalAuctionsCreated: number;
   points: number;
   bump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export type UserAccountAccountDataArgs = {
@@ -50,6 +53,8 @@ export type UserAccountAccountDataArgs = {
   totalAuctionsCreated: number;
   points: number;
   bump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export function getUserAccountAccountDataSerializer(): Serializer<
@@ -67,6 +72,8 @@ export function getUserAccountAccountDataSerializer(): Serializer<
         ['totalAuctionsCreated', u32()],
         ['points', u32()],
         ['bump', u8()],
+        ['padding', array(u8(), { size: 3 })],
+        ['reserved', array(u8(), { size: 32 })],
       ],
       { description: 'UserAccountAccountData' }
     ),
@@ -152,6 +159,8 @@ export function getUserAccountGpaBuilder(
       totalAuctionsCreated: number;
       points: number;
       bump: number;
+      padding: Array<number>;
+      reserved: Array<number>;
     }>({
       discriminator: [0, bytes({ size: 8 })],
       owner: [8, publicKeySerializer()],
@@ -161,6 +170,8 @@ export function getUserAccountGpaBuilder(
       totalAuctionsCreated: [52, u32()],
       points: [56, u32()],
       bump: [60, u8()],
+      padding: [61, array(u8(), { size: 3 })],
+      reserved: [64, array(u8(), { size: 32 })],
     })
     .deserializeUsing<UserAccount>((account) => deserializeUserAccount(account))
     .whereField(

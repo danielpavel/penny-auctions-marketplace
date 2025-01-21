@@ -40,6 +40,9 @@ impl<'info> InitializeUser<'info> {
             total_auctions_created: 0,
             points: 0,
             bump: bumps.user_account,
+
+            padding: [0; 3],
+            _reserved: [0; 32],
         });
 
         emit!(UserCreated {

@@ -11,4 +11,7 @@ pub struct UserAccount {
 
     pub points: u32,
     pub bump: u8,
+
+    pub padding: [u8; 3],
+    pub _reserved: [u8; 32],
 }
