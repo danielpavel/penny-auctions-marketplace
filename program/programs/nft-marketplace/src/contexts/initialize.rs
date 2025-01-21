@@ -75,6 +75,9 @@ impl<'info> Initialize<'info> {
             mint_tiers,
             bump: bumps.marketplace,
             treasury_bump: bumps.treasury,
+
+            padding: [0; 2],
+            _reserved: [0; 64],
         };
 
         self.marketplace.set_inner(inner.clone());

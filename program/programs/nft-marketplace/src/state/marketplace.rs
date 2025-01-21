@@ -27,4 +27,7 @@ pub struct Marketplace {
     pub mint_tiers: [MintTier; 3],
     pub bump: u8,
     pub treasury_bump: u8,
+
+    pub padding: [u8; 2],
+    pub _reserved: [u8; 64],
 }

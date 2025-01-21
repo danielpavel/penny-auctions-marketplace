@@ -44,6 +44,8 @@ export type MarketplaceAccountData = {
   mintTiers: Array<MintTier>;
   bump: number;
   treasuryBump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export type MarketplaceAccountDataArgs = {
@@ -55,6 +57,8 @@ export type MarketplaceAccountDataArgs = {
   mintTiers: Array<MintTierArgs>;
   bump: number;
   treasuryBump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export function getMarketplaceAccountDataSerializer(): Serializer<
@@ -73,6 +77,8 @@ export function getMarketplaceAccountDataSerializer(): Serializer<
         ['mintTiers', array(getMintTierSerializer(), { size: 3 })],
         ['bump', u8()],
         ['treasuryBump', u8()],
+        ['padding', array(u8(), { size: 2 })],
+        ['reserved', array(u8(), { size: 64 })],
       ],
       { description: 'MarketplaceAccountData' }
     ),
@@ -159,6 +165,8 @@ export function getMarketplaceGpaBuilder(
       mintTiers: Array<MintTierArgs>;
       bump: number;
       treasuryBump: number;
+      padding: Array<number>;
+      reserved: Array<number>;
     }>({
       discriminator: [0, bytes({ size: 8 })],
       admin: [8, publicKeySerializer()],
@@ -169,6 +177,8 @@ export function getMarketplaceGpaBuilder(
       mintTiers: [null, array(getMintTierSerializer(), { size: 3 })],
       bump: [null, u8()],
       treasuryBump: [null, u8()],
+      padding: [null, array(u8(), { size: 2 })],
+      reserved: [null, array(u8(), { size: 64 })],
     })
     .deserializeUsing<Marketplace>((account) => deserializeMarketplace(account))
     .whereField(
