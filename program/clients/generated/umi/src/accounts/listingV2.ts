@@ -21,6 +21,7 @@ import {
 } from '@metaplex-foundation/umi';
 import {
   Serializer,
+  array,
   bool,
   bytes,
   mapSerializer,
@@ -47,6 +48,8 @@ export type ListingV2AccountData = {
   buyoutPrice: bigint;
   seed: bigint;
   bump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export type ListingV2AccountDataArgs = {
@@ -63,6 +66,8 @@ export type ListingV2AccountDataArgs = {
   buyoutPrice: number | bigint;
   seed: number | bigint;
   bump: number;
+  padding: Array<number>;
+  reserved: Array<number>;
 };
 
 export function getListingV2AccountDataSerializer(): Serializer<
@@ -86,6 +91,8 @@ export function getListingV2AccountDataSerializer(): Serializer<
         ['buyoutPrice', u64()],
         ['seed', u64()],
         ['bump', u8()],
+        ['padding', array(u8(), { size: 6 })],
+        ['reserved', array(u8(), { size: 32 })],
       ],
       { description: 'ListingV2AccountData' }
     ),
@@ -177,6 +184,8 @@ export function getListingV2GpaBuilder(
       buyoutPrice: number | bigint;
       seed: number | bigint;
       bump: number;
+      padding: Array<number>;
+      reserved: Array<number>;
     }>({
       discriminator: [0, bytes({ size: 8 })],
       mint: [8, publicKeySerializer()],
@@ -192,6 +201,8 @@ export function getListingV2GpaBuilder(
       buyoutPrice: [153, u64()],
       seed: [161, u64()],
       bump: [169, u8()],
+      padding: [170, array(u8(), { size: 6 })],
+      reserved: [176, array(u8(), { size: 32 })],
     })
     .deserializeUsing<ListingV2>((account) => deserializeListingV2(account))
     .whereField(

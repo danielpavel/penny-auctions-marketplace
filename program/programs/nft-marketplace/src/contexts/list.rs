@@ -125,6 +125,9 @@ impl<'info> List<'info> {
             buyout_price,
             seed,
             bump: bumps.listing,
+
+            padding: [0; 6],
+            _reserved: [0; 32],
         });
 
         Ok(())

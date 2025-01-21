@@ -33,4 +33,7 @@ pub struct ListingV2 {
     pub buyout_price: u64,
     pub seed: u64,
     pub bump: u8,
+
+    pub padding: [u8; 6],
+    pub _reserved: [u8; 32],
 }
