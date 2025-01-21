@@ -58,17 +58,16 @@ pub mod nft_marketplace {
             .transfer_to_escrow(amount, ctx.remaining_accounts)?;
 
         ctx.accounts.emit_listing_created();
-        ctx.accounts.reward_user(ctx.bumps.user_account)?;
+        ctx.accounts.reward_user()?;
 
         Ok(())
     }
 
-    /* NOTE: currently disabled!
-     *
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
         ctx.accounts.initialize_user(&ctx.bumps)
     }
 
+    /* NOTE: currently disabled!
     pub fn delist(ctx: Context<Delist>) -> Result<()> {
         ctx.accounts.withdraw_and_close()
     }
@@ -84,7 +83,7 @@ pub mod nft_marketplace {
         current_bid: u64,
     ) -> Result<()> {
         ctx.accounts.place_bid(&highest_bidder, &current_bid)?;
-        ctx.accounts.reward_user(ctx.bumps.user_account)?;
+        ctx.accounts.reward_user()?;
 
         Ok(())
     }
@@ -101,7 +100,7 @@ pub mod nft_marketplace {
 
     pub fn mint_bid_token(ctx: Context<MintBidToken>, tier: MintCostTier) -> Result<()> {
         ctx.accounts.mint_token(tier)?;
-        ctx.accounts.reward_user(ctx.bumps.user_account)?;
+        ctx.accounts.reward_user()?;
 
         Ok(())
     }

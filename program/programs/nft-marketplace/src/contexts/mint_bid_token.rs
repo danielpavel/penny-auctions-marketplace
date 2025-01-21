@@ -24,11 +24,9 @@ pub struct MintBidToken<'info> {
     pub user: Signer<'info>,
 
     #[account(
-        init_if_needed,
-        payer = user,
-        space = 8 + UserAccount::INIT_SPACE,
+        mut,
         seeds = [b"user", marketplace.key().as_ref(), user.key().as_ref()],
-        bump
+        bump = user_account.bump
         )
     ]
     pub user_account: Box<Account<'info, UserAccount>>,
@@ -107,10 +105,7 @@ impl<'info> MintBidToken<'info> {
         mint_to(cpi_context, amount)
     }
 
-    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
-        self.user_account.bump = bump;
-        self.user_account.owner = self.user.key();
-
+    pub fn reward_user(&mut self) -> Result<()> {
         self.user_account.points = self
             .user_account
             .points

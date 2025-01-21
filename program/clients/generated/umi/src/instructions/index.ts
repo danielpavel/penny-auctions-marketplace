@@ -8,6 +8,7 @@
 
 export * from './endListing';
 export * from './initialize';
+export * from './initializeUser';
 export * from './list';
 export * from './mintBidToken';
 export * from './placeBid';

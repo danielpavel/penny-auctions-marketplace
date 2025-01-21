@@ -31,11 +31,9 @@ pub struct List<'info> {
     admin: Signer<'info>,
 
     #[account(
-        init_if_needed,
-        payer = seller,
-        space = 8 + UserAccount::INIT_SPACE,
+        mut,
         seeds = [b"user", marketplace.key().as_ref(), seller.key().as_ref()],
-        bump
+        bump = user_account.bump
         )
     ]
     pub user_account: Box<Account<'info, UserAccount>>,
@@ -240,10 +238,7 @@ impl<'info> List<'info> {
         });
     }
 
-    pub fn reward_user(&mut self, bump: u8) -> Result<()> {
-        self.user_account.bump = bump;
-        self.user_account.owner = self.seller.key();
-
+    pub fn reward_user(&mut self) -> Result<()> {
         self.user_account.points = self
             .user_account
             .points

@@ -28,6 +28,7 @@ import {
   MintTier,
   placeBid,
   updateMarketplaceMintTiers,
+  initializeUser,
 } from "../clients/generated/umi/src/";
 import {
   fetchToken,
@@ -257,6 +258,45 @@ describe("nft-marketplace", () => {
       console.error("Update Mint Tiers Error:", err);
       expect.fail("❌ Update Mint Tiers Tx Failed");
     }
+  });
+
+  it("Initialize user accounts", async () => {
+    await Promise.all(
+      [initializer, user1, user2, user3].map(async (u) => {
+        try {
+          const userSigner = createSignerFromKeypair(
+            umi,
+            umi.eddsa.createKeypairFromSecretKey(u.secretKey)
+          );
+
+          const userPDA = umi.eddsa.findPda(programId, [
+            bytes().serialize(new Uint8Array([117, 115, 101, 114])),
+            publicKeySerializer().serialize(fromWeb3JsPublicKey(marketplace)),
+            publicKeySerializer().serialize(userSigner.publicKey),
+          ]);
+
+          const txResult = await initializeUser(umi, {
+            user: userSigner,
+            userAccount: userPDA,
+            marketplace: fromWeb3JsPublicKey(marketplace),
+          }).sendAndConfirm(umi, options);
+
+          if (txResult.result.value.err) {
+            throw new Error(txResult.result.value.err.toString());
+          }
+
+          const userAccount = await fetchUserAccount(umi, userPDA);
+          expect(userAccount.bump).to.eq(userPDA[1]);
+          expect(userAccount.totalAuctionsParticipated).to.eq(0);
+          expect(userAccount.totalAuctionsWon).to.eq(0);
+          expect(userAccount.totalAuctionsCreated).to.eq(0);
+          expect(userAccount.totalBidsPlaced).to.eq(0);
+        } catch (err) {
+          console.error(err);
+          expect.fail("❌ Initialize User tx failed!");
+        }
+      })
+    );
   });
 
   it("Create Listing", async () => {
@@ -1269,40 +1309,6 @@ describe("nft-marketplace", () => {
     expect(user.totalAuctionsWon).to.eq(1);
     expect(user.points).to.eq(53);
   });
-
-  /* NOTE: Disabled!
-   *
-  it("initialize user", async () => {
-    const [user, bump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [anchor.utils.bytes.utf8.encode("user"), user1.publicKey.toBuffer()],
-      program.programId
-    );
-
-    let accounts = {
-      user: user1.publicKey,
-      user_account: user,
-    };
-
-    try {
-      let tx = await program.methods
-        .initializeUser()
-        .accounts(accounts)
-        .signers([user1])
-        .rpc();
-
-      console.log("Your transaction signature", tx);
-    } catch (error) {
-      console.error(error);
-    }
-
-    const userAccount = await program.account.userAccount.fetch(user);
-    expect(userAccount.totalBidsPlaced).to.equal(0);
-    expect(userAccount.totalAuctionsWon).to.equal(0);
-    expect(userAccount.totalAuctionsParticipated).to.equal(0);
-    expect(userAccount.points).to.equal(0);
-    expect(userAccount.bump).to.equal(bump);
-  });
-  */
 });
 
 // Helpers
