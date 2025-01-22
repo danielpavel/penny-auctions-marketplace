@@ -83,8 +83,7 @@ impl<'info> Initialize<'info> {
         self.marketplace.set_inner(inner.clone());
 
         emit!(MarketplaceInitialized {
-            marketplace: self.marketplace.clone().into_inner(),
-            pubkey: self.marketplace.key(),
+            marketplace_pubkey: self.marketplace.key(),
             label: MARKET_INITIALIZED_LABEL.to_string()
         });
 

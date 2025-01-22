@@ -46,8 +46,7 @@ impl<'info> InitializeUser<'info> {
         });
 
         emit!(UserCreated {
-            user: self.user_account.clone().into_inner(),
-            pubkey: self.user.key(),
+            user_pubkey: self.user.key(),
             label: USER_CREATED_LABEL.to_string()
         });
 

@@ -232,11 +232,8 @@ impl<'info> List<'info> {
     }
 
     pub fn emit_listing_created(&self) {
-        let inner_listing = self.listing.clone().into_inner();
-
         emit!(ListingCreated {
-            listing: inner_listing,
-            pubkey: self.listing.key(),
+            listing_pubkey: self.listing.key(),
             label: LISTING_CREATED_LABEL.to_string(),
         });
     }

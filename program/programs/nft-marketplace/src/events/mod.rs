@@ -1,19 +1,15 @@
 use anchor_lang::prelude::*;
 
-use crate::state::{ListingV2, Marketplace, UserAccount};
-
 #[event]
 pub struct MarketplaceInitialized {
-    pub marketplace: Marketplace,
-    pub pubkey: Pubkey,
+    pub marketplace_pubkey: Pubkey,
     #[index]
     pub label: String,
 }
 
 #[event]
 pub struct ListingCreated {
-    pub listing: ListingV2,
-    pub pubkey: Pubkey,
+    pub listing_pubkey: Pubkey,
     #[index]
     pub label: String,
 }
@@ -44,8 +40,7 @@ pub struct BidPlaced {
 
 #[event]
 pub struct UserCreated {
-    pub user: UserAccount,
-    pub pubkey: Pubkey,
+    pub user_pubkey: Pubkey,
     #[index]
     pub label: String,
 }

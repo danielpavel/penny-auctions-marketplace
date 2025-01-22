@@ -102,7 +102,7 @@ export function initialize(
   // Program ID.
   const programId = context.programs.getPublicKey(
     'nftMarketplace',
-    'ATxkTBH2cbC28hV7n37QZ5d9hsc2Xpoio4ZHYSYFGHou'
+    '8dsRGc9QXnsvqa5aCm21wS2M9xCPoVqxPpD3j6bysfyt'
   );
 
   // Accounts.

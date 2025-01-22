@@ -13,19 +13,13 @@ import {
   string,
   struct,
 } from '@metaplex-foundation/umi/serializers';
-import { Marketplace, MarketplaceArgs, getMarketplaceSerializer } from '.';
 
 export type MarketplaceInitialized = {
-  marketplace: Marketplace;
-  pubkey: PublicKey;
+  marketplacePubkey: PublicKey;
   label: string;
 };
 
-export type MarketplaceInitializedArgs = {
-  marketplace: MarketplaceArgs;
-  pubkey: PublicKey;
-  label: string;
-};
+export type MarketplaceInitializedArgs = MarketplaceInitialized;
 
 export function getMarketplaceInitializedSerializer(): Serializer<
   MarketplaceInitializedArgs,
@@ -33,8 +27,7 @@ export function getMarketplaceInitializedSerializer(): Serializer<
 > {
   return struct<MarketplaceInitialized>(
     [
-      ['marketplace', getMarketplaceSerializer()],
-      ['pubkey', publicKeySerializer()],
+      ['marketplacePubkey', publicKeySerializer()],
       ['label', string()],
     ],
     { description: 'MarketplaceInitialized' }

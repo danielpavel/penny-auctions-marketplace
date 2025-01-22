@@ -18,7 +18,7 @@ import {
 } from '../errors';
 
 export const NFT_MARKETPLACE_PROGRAM_ID =
-  'ATxkTBH2cbC28hV7n37QZ5d9hsc2Xpoio4ZHYSYFGHou' as PublicKey<'ATxkTBH2cbC28hV7n37QZ5d9hsc2Xpoio4ZHYSYFGHou'>;
+  '8dsRGc9QXnsvqa5aCm21wS2M9xCPoVqxPpD3j6bysfyt' as PublicKey<'8dsRGc9QXnsvqa5aCm21wS2M9xCPoVqxPpD3j6bysfyt'>;
 
 export function createNftMarketplaceProgram(): Program {
   return {

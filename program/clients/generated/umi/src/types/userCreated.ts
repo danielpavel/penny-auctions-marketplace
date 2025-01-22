@@ -13,19 +13,10 @@ import {
   string,
   struct,
 } from '@metaplex-foundation/umi/serializers';
-import { UserAccount, UserAccountArgs, getUserAccountSerializer } from '.';
 
-export type UserCreated = {
-  user: UserAccount;
-  pubkey: PublicKey;
-  label: string;
-};
+export type UserCreated = { userPubkey: PublicKey; label: string };
 
-export type UserCreatedArgs = {
-  user: UserAccountArgs;
-  pubkey: PublicKey;
-  label: string;
-};
+export type UserCreatedArgs = UserCreated;
 
 export function getUserCreatedSerializer(): Serializer<
   UserCreatedArgs,
@@ -33,8 +24,7 @@ export function getUserCreatedSerializer(): Serializer<
 > {
   return struct<UserCreated>(
     [
-      ['user', getUserAccountSerializer()],
-      ['pubkey', publicKeySerializer()],
+      ['userPubkey', publicKeySerializer()],
       ['label', string()],
     ],
     { description: 'UserCreated' }

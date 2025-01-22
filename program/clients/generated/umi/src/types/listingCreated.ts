@@ -13,19 +13,10 @@ import {
   string,
   struct,
 } from '@metaplex-foundation/umi/serializers';
-import { ListingV2, ListingV2Args, getListingV2Serializer } from '.';
 
-export type ListingCreated = {
-  listing: ListingV2;
-  pubkey: PublicKey;
-  label: string;
-};
+export type ListingCreated = { listingPubkey: PublicKey; label: string };
 
-export type ListingCreatedArgs = {
-  listing: ListingV2Args;
-  pubkey: PublicKey;
-  label: string;
-};
+export type ListingCreatedArgs = ListingCreated;
 
 export function getListingCreatedSerializer(): Serializer<
   ListingCreatedArgs,
@@ -33,8 +24,7 @@ export function getListingCreatedSerializer(): Serializer<
 > {
   return struct<ListingCreated>(
     [
-      ['listing', getListingV2Serializer()],
-      ['pubkey', publicKeySerializer()],
+      ['listingPubkey', publicKeySerializer()],
       ['label', string()],
     ],
     { description: 'ListingCreated' }
