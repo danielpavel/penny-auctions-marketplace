@@ -1,9 +1,10 @@
 {
   "fee": 500,
+  "name": "Sandcastle Marketplace",
   "tokenName": "Sandcastle Bid Token",
   "tokenSymbol": "sBid",
   "tokenUri": "",
-  "mintCostTier": [
+  "mintCosts": [
     {
       "tier": 0,
       "amount": 75000000,

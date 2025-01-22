@@ -9,6 +9,7 @@ import {
   Umi,
   Program as UmiProgram,
   createSignerFromKeypair,
+  UmiPlugin,
 } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import path from "path";
@@ -17,6 +18,7 @@ import {
   getNftMarketplaceProgram,
   initialize,
   InitializeInstructionArgs,
+  createNftMarketplaceProgram,
 } from "../clients/generated/umi/src";
 import { mplToolbox } from "@metaplex-foundation/mpl-toolbox";
 import { getKeypairFromFile } from "@solana-developers/helpers";
@@ -44,6 +46,9 @@ export const intializeMarketplace = async (
   try {
     const { fee, tokenName, tokenSymbol, uri, name, mintCosts } = args;
 
+    console.log("Initializing Marketplace with config:");
+    console.log(args);
+
     const sBidMint = generateSigner(umi);
     const marketplacePDA = umi.eddsa.findPda(program.publicKey, [
       bytes().serialize(
@@ -51,7 +56,7 @@ export const intializeMarketplace = async (
       ),
       publicKeySerializer().serialize(admin.publicKey),
       publicKeySerializer().serialize(sBidMint.publicKey),
-      string().serialize(name),
+      string({ size: "variable" }).serialize(name),
     ]);
 
     const txResult = await initialize(umi, {
@@ -113,6 +118,15 @@ export const initializePrereqs = async (
   umi.use(keypairIdentity(admin));
   umi.use(mplTokenMetadata());
   umi.use(mplToolbox());
+
+  // Register Nft Marketplace Program
+  const nftMarketplaceProgram = (): UmiPlugin => ({
+    install(umi) {
+      umi.programs.add(createNftMarketplaceProgram());
+    },
+  });
+
+  umi.use(nftMarketplaceProgram());
 
   return {
     umi,

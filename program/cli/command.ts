@@ -22,7 +22,7 @@ commander
     try {
       const { umi, program, admin } = await initializePrereqs(
         "devnet",
-        "./wallets/admin.json"
+        options.admin
       );
 
       const configFile = fs.readFileSync(options.config, "utf-8");
