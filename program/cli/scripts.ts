@@ -243,44 +243,9 @@ export const getOrCreateUserAccount = async (
 
     console.log("✅ Done with sig:", base58.deserialize(txResult.signature)[0]);
   } catch (err) {
-    throw new Error("❌ Creating User Account Tx Failed with:", err);
+    console.error(err);
+    throw new Error("❌ Creating User Account Tx Failed with:");
   }
 
   return userAccountPDA;
 };
-
-/**
- * Create Test NFT
- */
-// export const initTestNftCollection = async () => {
-//   collection = await createCollectionNft(umi);
-//
-//   console.log("Collection: ", collection.toBase58());
-// };
-
-/**
- * Create Test NFT
- */
-// export const mintTestNft = async (
-//   toAccount: PublicKey,
-//   collection: PublicKey,
-//   pNft: boolean
-// ) => {
-//   console.log(
-//     `Minting ${
-//       pNft ? "pNFT" : "NFT"
-//     } into Collection ${collection.toBase58()} to ${toAccount.toBase58()}...`
-//   );
-//
-//   const rand = Math.floor(Math.random() * 100);
-//   const { mint, ata } = await mintNftAndVerify({
-//     umi,
-//     randomNumber: rand,
-//     account: toAccount,
-//     collection,
-//     pNft,
-//   });
-//
-//   console.log("Mint: ", mint.toBase58());
-//   console.log("Ata: ", ata.toBase58());
-// };
