@@ -1,17 +1,27 @@
 import { program as commander } from "commander";
 
-import { initializePrereqs, intializeMarketplace } from "./scripts";
-import { InitializeInstructionArgs } from "../clients/generated/umi/src";
+import {
+  initializePrereqs,
+  intializeMarketplace,
+  mintBidTokens,
+} from "./scripts";
+import {
+  InitializeInstructionArgs,
+  safeFetchMarketplace,
+} from "../clients/generated/umi/src";
 
 import fs from "fs";
-import { TransactionBuilderSendAndConfirmOptions } from "@metaplex-foundation/umi";
+import {
+  TransactionBuilderSendAndConfirmOptions,
+  publicKey,
+} from "@metaplex-foundation/umi";
 
 const opts: TransactionBuilderSendAndConfirmOptions = {
-  send: { skipPreflight: false },
+  send: { skipPreflight: true },
   confirm: { commitment: "confirmed" },
 };
 
-commander.version("0.1.0").description("CLI for testing Penny Auction program");
+commander.version("0.1.0").description("CLI for testing Sandcastle program");
 
 commander
   .command("initialize")
@@ -214,25 +224,28 @@ commander
 //     }
 //   });
 //
-// commander
-//   .command("get-marketplace-info")
-//   .description("Get information about a marketplace")
-//   .option("-a, --marketplace <address>", "Marketplace PDA address")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-k, --keypair <path>", "Path to keypair file")
-//   .action(async (options) => {
-//     try {
-//       const { cluster, keypair, marketplace } = options;
-//
-//       const address = new PublicKey(marketplace);
-//
-//       await setClusterConfig(cluster, keypair);
-//
-//       await getMarketplace(address);
-//     } catch (error) {
-//       console.error("Error fetching marketplace info:", error);
-//     }
-//   });
+
+commander
+  .command("get-marketplace")
+  .description("Fetch information about a marketplace")
+  .requiredOption("-m, --marketplace <address>", "Marketplace PDA address")
+  .action(async (options) => {
+    try {
+      const { umi } = await initializePrereqs("devnet", "wallets/admin.json");
+      const marketplacePubkey = publicKey(options.marketplace);
+
+      console.log("marketplace key", marketplacePubkey);
+
+      const account = await safeFetchMarketplace(umi, marketplacePubkey);
+      if (!account) {
+        throw new Error(`Markeplace ${marketplacePubkey.toString()} not found`);
+      }
+
+      console.log("Marketplace:", account);
+    } catch (error) {
+      console.error("Error fetching marketplace info:", error);
+    }
+  });
 //
 // commander
 //   .command("get-all-marketplaces")
@@ -251,32 +264,35 @@ commander
 //     }
 //   });
 
-// commander
-//   .command("mint-bid-token")
-//   .description("Mine bid tokens")
-//   .option("-a --amount <number>", "Address of the receiver wallet")
-//   .option("-r --receiver <address>", "Address of the receiver wallet")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-k, --keypair <path>", "Path to keypair file")
-//   .option("-m, --mint <value>", "Mint of the bid token")
-//   .action(async (options) => {
-//     try {
-//       const { cluster, keypair, receiver, amount, mint } = options;
-//
-//       console.log("Amount:", amount);
-//       console.log("To:", receiver);
-//       console.log("Cluster:", cluster);
-//       console.log("Keypair:", keypair);
-//
-//       const to = new PublicKey(receiver);
-//
-//       await setClusterConfig(cluster, keypair);
-//       initializeUmi();
-//
-//       await mintBidTokens(amount, to, new PublicKey(mint));
-//     } catch (error) {
-//       console.error("Error fetching marketplace info:", error);
-//     }
-//   });
+commander
+  .command("mint-bid-token")
+  .description("Mine bid tokens")
+  .requiredOption("-k, --keypair <path>", "Path to keypair file")
+  .requiredOption("-m, --marketplace <address>", "Marketplace publicKey")
+  .requiredOption("-t, --tier <number>", "Mint Tier (0 | 1 | 2)")
+  .action(async (options) => {
+    try {
+      const { umi, admin } = await initializePrereqs(
+        "devnet",
+        "wallets/admin.json"
+      );
+
+      const tier = Number(options.tier);
+      if (tier < 0 || tier > 2) {
+        throw new Error("Tier must be 0, 1, or 2");
+      }
+
+      await mintBidTokens(
+        umi,
+        admin,
+        options.marketplace,
+        options.keypair,
+        opts,
+        tier
+      );
+    } catch (error) {
+      console.log("❌ Mint Bid Tokens Failed with error", error);
+    }
+  });
 
 commander.parse(process.argv);

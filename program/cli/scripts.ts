@@ -10,6 +10,8 @@ import {
   Program as UmiProgram,
   createSignerFromKeypair,
   UmiPlugin,
+  publicKey,
+  PublicKey as UmiPublicKey,
 } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import path from "path";
@@ -19,8 +21,17 @@ import {
   initialize,
   InitializeInstructionArgs,
   createNftMarketplaceProgram,
+  fetchMarketplace,
+  mintBidToken,
+  fetchUserAccount,
+  safeFetchUserAccount,
+  initializeUser,
+  safeFetchMarketplace,
 } from "../clients/generated/umi/src";
-import { mplToolbox } from "@metaplex-foundation/mpl-toolbox";
+import {
+  findAssociatedTokenPda,
+  mplToolbox,
+} from "@metaplex-foundation/mpl-toolbox";
 import { getKeypairFromFile } from "@solana-developers/helpers";
 import {
   bytes,
@@ -28,6 +39,10 @@ import {
   publicKey as publicKeySerializer,
   base58,
 } from "@metaplex-foundation/umi/serializers";
+import { getMarketplaceTreasuryPda, getUserAccountPda } from "./utils";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { fromWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
+import { use } from "chai";
 
 dotenv.config();
 
@@ -96,11 +111,63 @@ export const getAuctionListing = async () => {};
 
 export const getAllAuctionListings = async () => {};
 
-export const getMarketplace = async () => {};
-
 export const getAllMarketplaces = async () => {};
 
-export const mintBidTokens = async () => {};
+export const mintBidTokens = async (
+  umi: Umi,
+  admin: Signer,
+  marketplace: string,
+  keypairFilePath: string,
+  opts: TransactionBuilderSendAndConfirmOptions,
+  tier: number
+) => {
+  try {
+    console.log("Fetching Marketplace...");
+    const marketplacePubkey = publicKey(marketplace);
+    const marketplaceAccount = await fetchMarketplace(umi, marketplacePubkey);
+    console.log("✅ Done!");
+
+    const sBidMint = marketplaceAccount.sbidMint;
+    const userSigner = await getSignerFromSecretKeyFile(umi, keypairFilePath);
+
+    console.log("Minting Tokens...");
+
+    const [ata] = findAssociatedTokenPda(umi, {
+      mint: sBidMint,
+      owner: userSigner.publicKey,
+      tokenProgramId: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+    });
+
+    const [userAccountPDA] = await getOrCreateUserAccount(
+      umi,
+      userSigner,
+      marketplacePubkey,
+      opts
+    );
+
+    const [treasuryPDA] = getMarketplaceTreasuryPda(umi, marketplacePubkey);
+
+    const txResult = await mintBidToken(umi, {
+      admin,
+      user: userSigner,
+      userAccount: userAccountPDA,
+      marketplace: marketplacePubkey,
+      treasury: treasuryPDA,
+      sbidMint: sBidMint,
+      userSbidAta: ata,
+      tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+      tier,
+    }).sendAndConfirm(umi, opts);
+
+    console.log(
+      "✅ Done! With sig:",
+      base58.deserialize(txResult.signature)[0]
+    );
+  } catch (err) {
+    console.error("Error details:", err);
+    throw err;
+  }
+};
 
 // Utility Functions
 export const initializePrereqs = async (
@@ -133,6 +200,53 @@ export const initializePrereqs = async (
     program: getNftMarketplaceProgram(umi),
     admin: createSignerFromKeypair(umi, admin),
   };
+};
+
+export const getSignerFromSecretKeyFile = async (
+  umi: Umi,
+  secretKeyPath: string
+) => {
+  const keypairPath = path.join(process.cwd(), secretKeyPath);
+  const kp = await getKeypairFromFile(keypairPath);
+
+  return createSignerFromKeypair(
+    umi,
+    umi.eddsa.createKeypairFromSecretKey(kp.secretKey)
+  );
+};
+
+export const getOrCreateUserAccount = async (
+  umi: Umi,
+  user: Signer,
+  marketplace: UmiPublicKey,
+  options: TransactionBuilderSendAndConfirmOptions
+) => {
+  const userAccountPDA = getUserAccountPda(umi, marketplace, user.publicKey);
+
+  const userAccount = await safeFetchUserAccount(umi, userAccountPDA);
+  if (userAccount) {
+    return userAccountPDA;
+  }
+
+  console.log(
+    "userAccount: ",
+    userAccountPDA[0].toString(),
+    " not found. Creating it..."
+  );
+
+  try {
+    const txResult = await initializeUser(umi, {
+      user,
+      userAccount: userAccountPDA,
+      marketplace,
+    }).sendAndConfirm(umi, options);
+
+    console.log("✅ Done with sig:", base58.deserialize(txResult.signature)[0]);
+  } catch (err) {
+    throw new Error("❌ Creating User Account Tx Failed with:", err);
+  }
+
+  return userAccountPDA;
 };
 
 /**

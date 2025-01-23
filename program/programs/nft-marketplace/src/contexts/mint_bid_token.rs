@@ -33,6 +33,7 @@ pub struct MintBidToken<'info> {
 
     #[account(
         has_one = sbid_mint,
+        has_one = treasury,
         seeds = [b"marketplace", admin.key().as_ref(), sbid_mint.key().as_ref(), marketplace.name.as_str().as_bytes()],
         bump = marketplace.bump
     )]
@@ -111,8 +112,6 @@ impl<'info> MintBidToken<'info> {
             .points
             .checked_add(REWARD_TIER_1)
             .ok_or(ProgramError::ArithmeticOverflow)?;
-
-        msg!("[mint_bid_token][reward_user] {:?}", self.user_account);
 
         Ok(())
     }
