@@ -1,6 +1,7 @@
 import { program as commander } from "commander";
 
 import {
+  bid,
   createAuctionListing,
   getSignerFromSecretKeyFile,
   initializePrereqs,
@@ -122,43 +123,41 @@ commander
       console.error("Error creating auction:", err);
     }
   });
-//
-// commander
-//   .command("place-bid")
-//   .description("Place a bid on an auction")
-//   .option("-a, --auction <address>", "Auction PDA address")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-b, --bids <value>", "Mint of the bid token")
-//   .option("-k, --keypair <path>", "User address")
-//   .action(async (options) => {
-//     try {
-//       const { nft, cluster, keypair, bids } = options;
-//
-//       try {
-//         const mint = new PublicKey(nft);
-//         const bidsMint = new PublicKey(bids);
-//
-//         await setClusterConfig(cluster, keypair);
-//
-//         const walletKeypair = web3.Keypair.fromSecretKey(
-//           Uint8Array.from(JSON.parse(fs.readFileSync(keypair, "utf-8"))),
-//           { skipValidation: true }
-//         );
-//
-//         // TODO: Fetch auction first and fix placeBid!
-//
-//         await placeBid(walletKeypair, mint, bidsMint);
-//
-//         console.log(
-//           `Bid placed on auction: ${findAuctionProgramAddress(mint)}`
-//         );
-//       } catch (err) {
-//         throw new Error(err);
-//       }
-//     } catch (error) {
-//       console.error("Error placing bid:", error);
-//     }
-//   });
+
+commander
+  .command("place-bid")
+  .description("Place a bid on an auction")
+  .requiredOption("-k, --keypair <path>", "User address")
+  .requiredOption("-a, --auction <address>", "Auction Listing PDA address")
+  .requiredOption("-m, --marketplace <address>", "Marketplace PDA address")
+  .action(async (options) => {
+    try {
+      const { auction, keypair, marketplace } = options;
+      const { umi } = await initializePrereqs(CLUSTER, ADMIN);
+      const marketplacePubkey = publicKey(marketplace);
+
+      const marketplaceAccount = await safeFetchMarketplace(
+        umi,
+        marketplacePubkey
+      );
+      if (!marketplaceAccount) {
+        throw new Error(`Markeplace ${marketplacePubkey.toString()} not found`);
+      }
+
+      const bidder = await getSignerFromSecretKeyFile(umi, keypair);
+
+      await bid(
+        umi,
+        bidder,
+        marketplaceAccount.sbidMint,
+        publicKey(auction),
+        marketplacePubkey,
+        opts
+      );
+    } catch (error) {
+      console.log("❌ Place Bid failed with error", error);
+    }
+  });
 //
 // commander
 //   .command("end-auction")

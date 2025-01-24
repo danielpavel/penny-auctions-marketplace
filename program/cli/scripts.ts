@@ -37,6 +37,9 @@ import {
   fetchMarketplace,
   mintBidToken,
   list,
+  fetchListingV2,
+  safeFetchListingV2,
+  placeBid,
 } from "../clients/generated/umi/src";
 import {
   fetchMint,
@@ -200,7 +203,7 @@ export const createAuctionListing = async (
       });
       const [destinationTr] = findTokenRecordPda(umi, {
         mint,
-        token: escrow,
+        token: fromWeb3JsPublicKey(escrow),
       });
 
       const AUTH_RULES_PROGRAM = umi.programs.getPublicKey(
@@ -241,7 +244,59 @@ export const createAuctionListing = async (
 /**
  * Place a bid
  */
-export const placeBid = async () => {};
+export const bid = async (
+  umi: Umi,
+  user: Signer,
+  sbidMint: UmiPublicKey,
+  listing: UmiPublicKey,
+  marketplace: UmiPublicKey,
+  options: TransactionBuilderSendAndConfirmOptions
+) => {
+  const [userAccount] = await getOrCreateUserAccount(
+    umi,
+    user,
+    marketplace,
+    options
+  );
+
+  const [ata] = findAssociatedTokenPda(umi, {
+    mint: sbidMint,
+    owner: user.publicKey,
+    tokenProgramId: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+  });
+
+  console.log("Fetching listing account", listing.toString(), "...");
+  const listingAccount = await safeFetchListingV2(umi, listing);
+  if (!listingAccount) {
+    throw new Error("Failed to fetch listing account");
+  }
+  console.log("✅ Done.");
+
+  console.log("Placing bid...");
+
+  try {
+    const txResult = await placeBid(umi, {
+      bidder: user,
+      sbidMint,
+      userAccount,
+      bidderSbidAta: ata,
+      mint: listingAccount.mint,
+      listing,
+      marketplace,
+      tokenProgram: fromWeb3JsPublicKey(TOKEN_2022_PROGRAM_ID),
+      highestBidder: listingAccount.highestBidder,
+      currentBid: listingAccount.currentBid,
+    }).sendAndConfirm(umi, options);
+
+    console.log(
+      "✅ Done! With sig:",
+      base58.deserialize(txResult.signature)[0]
+    );
+  } catch (err) {
+    console.error("Error details:", err);
+    throw err;
+  }
+};
 
 /**
  * End an auction
