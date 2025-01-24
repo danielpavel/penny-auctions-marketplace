@@ -9,11 +9,13 @@ import {
   generateSigner,
   percentAmount,
   PublicKey,
+  Signer,
   TransactionBuilder,
   TransactionBuilderSendAndConfirmOptions,
   Umi,
 } from "@metaplex-foundation/umi";
 import {
+  base58,
   bytes,
   publicKey as publicKeySerializer,
 } from "@metaplex-foundation/umi/serializers";
@@ -46,37 +48,49 @@ export async function createCollectionNft(
 ) {
   const collectionMint = generateSigner(umi);
 
+  console.log("Creating Collection ", collectionMint.publicKey, " ...");
+
   const result = await createNft(umi, {
     mint: collectionMint,
+    authority: umi.payer,
     name: "My Collection",
     uri: "https://arweave.net/123",
     sellerFeeBasisPoints: percentAmount(5.5), // 5.5%
     isCollection: true,
   }).sendAndConfirm(umi, options);
 
-  return result.result.value.err ? null : collectionMint.publicKey;
+  if (result.result.value.err) {
+    console.error("❌ Failed with err", result.result.value.err);
+    return null;
+  }
+
+  console.log("✅ Done with sig:", base58.deserialize(result.signature)[0]);
+  return collectionMint.publicKey;
 }
 
 export async function mintNftAndVerify({
   umi,
   randomNumber,
-  account,
+  owner,
   collection,
   pNft,
+  opts,
 }: {
   umi: Umi;
   randomNumber: number;
-  account: PublicKey;
+  owner: PublicKey;
   collection: PublicKey;
   pNft: boolean;
+  opts: TransactionBuilderSendAndConfirmOptions;
 }) {
   try {
     const { mint, ata } = await mintNft({
       umi,
       randomNumber,
-      account,
+      owner,
       collection,
       pNft,
+      opts,
     });
 
     // first find the metadata PDA to use later
@@ -88,7 +102,7 @@ export async function mintNftAndVerify({
       metadata,
       collectionMint: collection,
       authority: umi.payer,
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
+    }).sendAndConfirm(umi, opts);
 
     return { mint, ata };
   } catch (error) {
@@ -99,25 +113,40 @@ export async function mintNftAndVerify({
 export async function mintNft({
   umi,
   randomNumber,
-  account,
+  owner,
   collection,
   pNft,
+  opts,
 }: {
   umi: Umi;
   randomNumber: number;
-  account: PublicKey;
+  owner: PublicKey;
   collection: PublicKey;
   pNft: boolean;
+  opts: TransactionBuilderSendAndConfirmOptions;
 }) {
   const mint = generateSigner(umi);
+
+  console.log("Minting NFT", mint.publicKey.toString(), "...");
 
   try {
     const [ata] = findAssociatedTokenPda(umi, {
       mint: mint.publicKey,
-      owner: account,
+      owner,
     });
 
     let txBuilder: TransactionBuilder = null;
+    const input = {
+      mint,
+      token: ata,
+      tokenOwner: owner,
+      authority: umi.payer,
+      sellerFeeBasisPoints: percentAmount(5),
+      isCollection: false,
+      collection: { key: collection, verified: false },
+      uri: "https://arweave.net/123",
+    };
+
     if (pNft) {
       // Decide on a ruleset for the Nft.
       // Metaplex ruleset - publicKey("eBJLFYPxJmMGKuFwpDWkzxZeUrad92kZRC5BJLpzyT9")
@@ -127,73 +156,57 @@ export async function mintNft({
 
       txBuilder = createProgrammableNft(umi, {
         name: `My pNft ${randomNumber}`,
-        mint,
-        token: ata,
-        tokenOwner: account,
-        sellerFeeBasisPoints: percentAmount(5),
-        isCollection: false,
-        collection: { key: collection, verified: false },
-        uri: "https://arweave.net/123",
+        ...input,
         ruleSet: ruleset,
       });
     } else {
       txBuilder = createNft(umi, {
         name: `My Nft ${randomNumber}`,
-        mint,
-        token: ata,
-        tokenOwner: account,
-        authority: umi.payer,
-        sellerFeeBasisPoints: percentAmount(5),
-        isCollection: false,
-        collection: { key: collection, verified: false },
-        uri: "https://arweave.net/123",
+        ...input,
       });
     }
 
-    let result = await txBuilder.sendAndConfirm(umi, {
-      confirm: { commitment: "confirmed" },
-    });
+    let result = await txBuilder.sendAndConfirm(umi, opts);
 
     if (result.result.value.err) {
-      return null;
+      console.error("❌ Failed with error", result.result.value.err);
+      return { mint: null, ata: null };
     }
 
+    console.log("✅ Done with sig:", base58.deserialize(result.signature)[0]);
     return { mint: mint.publicKey, ata };
   } catch (error) {
-    throw Error(`[mintNft] ${error}`);
+    console.error("[mintNft][error]", error);
+    throw error;
   }
 }
 
 export async function createAndMintNftForCollection(
   umi: Umi,
-  randomNumber: number,
-  account: PublicKey,
+  payer: Signer,
   options: TransactionBuilderSendAndConfirmOptions,
-  pNft?: boolean
+  pNft?: boolean,
+  collection?: PublicKey
 ) {
   try {
-    const collection = await createCollectionNft(umi, options);
-    if (!collection) {
-      throw new Error("Collection failed to create");
+    const rand = Math.floor(Math.random() * 1000) + 1;
+    let newCollection = collection;
+
+    if (!newCollection) {
+      newCollection = await createCollectionNft(umi, options);
+      if (!newCollection) {
+        throw new Error("Collection failed to create");
+      }
     }
 
-    const { mint, ata } = await mintNft({
+    const { mint, ata } = await mintNftAndVerify({
       umi,
-      randomNumber,
-      account,
-      collection: collection,
+      randomNumber: rand,
+      owner: payer.publicKey,
+      collection: newCollection,
       pNft,
+      opts: options,
     });
-
-    const metadata = findMetadataPda(umi, {
-      mint: mint,
-    });
-
-    await verifyCollectionV1(umi, {
-      metadata,
-      collectionMint: collection,
-      authority: umi.payer,
-    }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
 
     return {
       mint,

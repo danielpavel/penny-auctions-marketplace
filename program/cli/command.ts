@@ -1,6 +1,7 @@
 import { program as commander } from "commander";
 
 import {
+  getSignerFromSecretKeyFile,
   initializePrereqs,
   intializeMarketplace,
   mintBidTokens,
@@ -15,11 +16,14 @@ import {
   TransactionBuilderSendAndConfirmOptions,
   publicKey,
 } from "@metaplex-foundation/umi";
+import { createAndMintNftForCollection } from "./utils";
 
 const opts: TransactionBuilderSendAndConfirmOptions = {
   send: { skipPreflight: true },
   confirm: { commitment: "confirmed" },
 };
+
+const CLUSTER = "devnet";
 
 commander.version("0.1.0").description("CLI for testing Sandcastle program");
 
@@ -31,7 +35,7 @@ commander
   .action(async (options) => {
     try {
       const { umi, program, admin } = await initializePrereqs(
-        "devnet",
+        CLUSTER,
         options.admin
       );
 
@@ -44,32 +48,50 @@ commander
     }
   });
 
-// commander
-//   .command("mint-nft")
-//   .description("Mint a new test NFT")
-//   .option("-a, --account <address>", "Account address")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("--collection <value>", "NFT Collection address")
-//   .option("-k, --keypair <path>", "Seller address")
-//   .option(
-//     "-p, --programmable",
-//     "Have this flag if you want to mint a programmable NFT"
-//   )
-//   .action(async (options) => {
-//     const { account, cluster, keypair, programmable, collection } = options;
-//
-//     const address = new PublicKey(account);
-//     const collectionAddress = new PublicKey(collection);
-//
-//     await setClusterConfig(cluster, keypair);
-//     initializeUmi();
-//
-//     try {
-//       await mintTestNft(address, collectionAddress, programmable);
-//     } catch (err) {
-//       console.error("Error minting NFT:", err);
-//     }
-//   });
+commander
+  .command("mint-nft")
+  .description("Mint a new test NFT")
+  .requiredOption("-a, --admin <pubkey>", "Admin wallet")
+  .option("-k, --keypair <path>", "Seller address")
+  .option(
+    "-c, --collection <address>",
+    "PublicKey of collection, if absent a new collection will be created"
+  )
+  .option(
+    "-p, --programmable",
+    "Have this flag if you want to mint a programmable NFT"
+  )
+  .action(async (options) => {
+    try {
+      const { umi } = await initializePrereqs(CLUSTER, options.admin);
+
+      const { collection, programmable, keypair } = options;
+
+      const user = await getSignerFromSecretKeyFile(umi, keypair);
+
+      console.log("Creating mint...");
+
+      const {
+        mint,
+        ata,
+        collection: outCollection,
+      } = await createAndMintNftForCollection(
+        umi,
+        user,
+        opts,
+        !!(programmable != undefined),
+        collection
+      );
+
+      console.log("✅ Done.");
+      console.log("mint:", mint);
+      console.log("ata:", ata);
+      console.log("collection:", outCollection);
+    } catch (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  });
 //
 // commander
 //   .command("create-auction")
@@ -231,7 +253,7 @@ commander
   .requiredOption("-m, --marketplace <address>", "Marketplace PDA address")
   .action(async (options) => {
     try {
-      const { umi } = await initializePrereqs("devnet", "wallets/admin.json");
+      const { umi } = await initializePrereqs(CLUSTER, "wallets/admin.json");
       const marketplacePubkey = publicKey(options.marketplace);
 
       console.log("marketplace key", marketplacePubkey);
@@ -273,7 +295,7 @@ commander
   .action(async (options) => {
     try {
       const { umi, admin } = await initializePrereqs(
-        "devnet",
+        CLUSTER,
         "wallets/admin.json"
       );
 
