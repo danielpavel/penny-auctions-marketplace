@@ -18,7 +18,12 @@ import {
   base58,
   bytes,
   publicKey as publicKeySerializer,
+  u64,
 } from "@metaplex-foundation/umi/serializers";
+import {
+  initializeUser,
+  safeFetchUserAccount,
+} from "../clients/generated/umi/src";
 
 export const getUserAccountPda = (
   umi: Umi,
@@ -216,4 +221,60 @@ export async function createAndMintNftForCollection(
   } catch (err) {
     throw Error(`[createAndMintNftForCollection] ${err}`);
   }
+}
+
+export const getOrCreateUserAccount = async (
+  umi: Umi,
+  user: Signer,
+  marketplace: PublicKey,
+  options: TransactionBuilderSendAndConfirmOptions
+) => {
+  const userAccountPDA = getUserAccountPda(umi, marketplace, user.publicKey);
+
+  const userAccount = await safeFetchUserAccount(umi, userAccountPDA);
+  if (userAccount) {
+    return userAccountPDA;
+  }
+
+  console.log(
+    "userAccount: ",
+    userAccountPDA[0].toString(),
+    " not found. Creating it..."
+  );
+
+  try {
+    const txResult = await initializeUser(umi, {
+      user,
+      userAccount: userAccountPDA,
+      marketplace,
+    }).sendAndConfirm(umi, options);
+
+    console.log("✅ Done with sig:", base58.deserialize(txResult.signature)[0]);
+  } catch (err) {
+    console.error(err);
+    throw new Error("❌ Creating User Account Tx Failed with:");
+  }
+
+  return userAccountPDA;
+};
+
+export const getListingPDA = (
+  umi: Umi,
+  marketplace: PublicKey,
+  mint: PublicKey,
+  seed: bigint
+) => {
+  return umi.eddsa.findPda(umi.programs.getPublicKey("nftMarketplace"), [
+    bytes().serialize(new Uint8Array([108, 105, 115, 116, 105, 110, 103])),
+    publicKeySerializer().serialize(marketplace),
+    publicKeySerializer().serialize(mint),
+    u64().serialize(seed),
+  ]);
+};
+
+export function generateRandomU64Seed(umi: Umi) {
+  const randomBytes = generateSigner(umi).secretKey.slice(0, 8);
+
+  let view = new DataView(randomBytes.buffer, 0);
+  return view.getBigUint64(0, true);
 }

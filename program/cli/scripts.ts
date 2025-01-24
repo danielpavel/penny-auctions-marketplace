@@ -1,4 +1,8 @@
-import { clusterApiUrl } from "@solana/web3.js";
+import {
+  clusterApiUrl,
+  PublicKey,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
+} from "@solana/web3.js";
 
 import dotenv from "dotenv";
 import {
@@ -12,10 +16,19 @@ import {
   UmiPlugin,
   publicKey,
   PublicKey as UmiPublicKey,
+  TransactionBuilder,
+  AccountMeta,
 } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import path from "path";
-import { mplTokenMetadata } from "@metaplex-foundation/mpl-token-metadata";
+import {
+  fetchMetadata,
+  findMasterEditionPda,
+  findMetadataPda,
+  findTokenRecordPda,
+  mplTokenMetadata,
+  MPL_TOKEN_METADATA_PROGRAM_ID,
+} from "@metaplex-foundation/mpl-token-metadata";
 import {
   getNftMarketplaceProgram,
   initialize,
@@ -23,14 +36,14 @@ import {
   createNftMarketplaceProgram,
   fetchMarketplace,
   mintBidToken,
-  fetchUserAccount,
-  safeFetchUserAccount,
-  initializeUser,
-  safeFetchMarketplace,
+  list,
 } from "../clients/generated/umi/src";
 import {
+  fetchMint,
+  fetchToken,
   findAssociatedTokenPda,
   mplToolbox,
+  setComputeUnitLimit,
 } from "@metaplex-foundation/mpl-toolbox";
 import { getKeypairFromFile } from "@solana-developers/helpers";
 import {
@@ -39,10 +52,21 @@ import {
   publicKey as publicKeySerializer,
   base58,
 } from "@metaplex-foundation/umi/serializers";
-import { getMarketplaceTreasuryPda, getUserAccountPda } from "./utils";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { fromWeb3JsPublicKey } from "@metaplex-foundation/umi-web3js-adapters";
-import { use } from "chai";
+import {
+  generateRandomU64Seed,
+  getListingPDA,
+  getMarketplaceTreasuryPda,
+  getOrCreateUserAccount,
+} from "./utils";
+import {
+  getAssociatedTokenAddressSync,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import {
+  fromWeb3JsPublicKey,
+  toWeb3JsPublicKey,
+} from "@metaplex-foundation/umi-web3js-adapters";
 
 dotenv.config();
 
@@ -95,7 +119,124 @@ export const intializeMarketplace = async (
 /**
  * Create Auction Listing
  */
-export const createAuctionListing = async () => {};
+export const createAuctionListing = async (
+  umi: Umi,
+  seller: Signer,
+  mint: UmiPublicKey,
+  collection: UmiPublicKey,
+  marketplace: UmiPublicKey,
+  options: TransactionBuilderSendAndConfirmOptions
+) => {
+  try {
+    const [userAccount] = await getOrCreateUserAccount(
+      umi,
+      seller,
+      marketplace,
+      options
+    );
+
+    const price = BigInt(500000000);
+    const bidIncrement = (price * BigInt(10)) / BigInt(10_000);
+    const seed = generateRandomU64Seed(umi);
+    const durationInSlots = BigInt((30 * 60 * 1000) / 400); // 30 mins in slots
+    const timerExtensionInSlots = BigInt((30 * 1000) / 400); // 30 seconds in slots
+
+    const [listing] = getListingPDA(umi, marketplace, mint, seed);
+    // `findAssociatedTokenPda` does not support off-curve :(
+    const escrow = getAssociatedTokenAddressSync(
+      toWeb3JsPublicKey(mint),
+      toWeb3JsPublicKey(listing),
+      true
+    );
+    const [sellerAta] = findAssociatedTokenPda(umi, {
+      mint,
+      owner: seller.publicKey,
+    });
+
+    const [metadata] = findMetadataPda(umi, {
+      mint,
+    });
+    const [editionAccount] = findMasterEditionPda(umi, {
+      mint,
+    });
+
+    const slot = await umi.rpc.getSlot();
+
+    console.log("Creating Listing Acution", listing.toString(), "...");
+
+    const accounts = {
+      seller,
+      admin: umi.payer,
+      userAccount,
+      listing,
+      marketplace,
+      mint,
+      collection,
+      sellerAta,
+      escrow: fromWeb3JsPublicKey(escrow),
+      metadata,
+      masterEdition: editionAccount,
+      tokenProgram: fromWeb3JsPublicKey(TOKEN_PROGRAM_ID), // this looks ugly
+      sysvarInstructions: fromWeb3JsPublicKey(SYSVAR_INSTRUCTIONS_PUBKEY), // so does this ...
+      seed,
+      bidIncrement,
+      timerExtensionInSlots,
+      startTimeInSlots: slot,
+      initialDurationInSlots: durationInSlots,
+      buyoutPrice: price,
+      amount: BigInt(1),
+    };
+
+    let txResult;
+    const metadataAccount = await fetchMetadata(umi, metadata);
+    if (
+      metadataAccount.programmableConfig?.__option === "Some" &&
+      metadataAccount.programmableConfig?.value.__kind === "V1"
+    ) {
+      // We're dealing with a pNFT
+      const [ownerTr] = findTokenRecordPda(umi, {
+        mint,
+        token: sellerAta,
+      });
+      const [destinationTr] = findTokenRecordPda(umi, {
+        mint,
+        token: escrow,
+      });
+
+      const AUTH_RULES_PROGRAM = umi.programs.getPublicKey(
+        "authRulesProgram",
+        "auth9SigNpDKz4sJJ1DfCTuZrZNSAgh9sFD3rboVmgg"
+      );
+
+      const remainingAccounts: Array<AccountMeta> = [
+        {
+          pubkey: MPL_TOKEN_METADATA_PROGRAM_ID,
+          isSigner: false,
+          isWritable: false,
+        },
+        { pubkey: editionAccount, isSigner: false, isWritable: false },
+        { pubkey: ownerTr, isSigner: false, isWritable: true },
+        { pubkey: destinationTr, isSigner: false, isWritable: true },
+        { pubkey: AUTH_RULES_PROGRAM, isSigner: false, isWritable: true },
+      ];
+
+      const txBuilder = new TransactionBuilder();
+
+      txResult = await txBuilder
+        .add(list(umi, accounts).addRemainingAccounts(remainingAccounts))
+        .add(setComputeUnitLimit(umi, { units: 600_000 }))
+        .sendAndConfirm(umi, options);
+    } else {
+      // Regular NFT
+      txResult = await list(umi, accounts).sendAndConfirm(umi, options);
+    }
+
+    console.log("✅ Done with sig:", base58.deserialize(txResult.signature)[0]);
+  } catch (error) {
+    console.error("❌ Failed with error:", error);
+    throw error;
+  }
+};
 
 /**
  * Place a bid
@@ -213,39 +354,4 @@ export const getSignerFromSecretKeyFile = async (
     umi,
     umi.eddsa.createKeypairFromSecretKey(kp.secretKey)
   );
-};
-
-export const getOrCreateUserAccount = async (
-  umi: Umi,
-  user: Signer,
-  marketplace: UmiPublicKey,
-  options: TransactionBuilderSendAndConfirmOptions
-) => {
-  const userAccountPDA = getUserAccountPda(umi, marketplace, user.publicKey);
-
-  const userAccount = await safeFetchUserAccount(umi, userAccountPDA);
-  if (userAccount) {
-    return userAccountPDA;
-  }
-
-  console.log(
-    "userAccount: ",
-    userAccountPDA[0].toString(),
-    " not found. Creating it..."
-  );
-
-  try {
-    const txResult = await initializeUser(umi, {
-      user,
-      userAccount: userAccountPDA,
-      marketplace,
-    }).sendAndConfirm(umi, options);
-
-    console.log("✅ Done with sig:", base58.deserialize(txResult.signature)[0]);
-  } catch (err) {
-    console.error(err);
-    throw new Error("❌ Creating User Account Tx Failed with:");
-  }
-
-  return userAccountPDA;
 };

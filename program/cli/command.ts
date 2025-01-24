@@ -1,12 +1,14 @@
 import { program as commander } from "commander";
 
 import {
+  createAuctionListing,
   getSignerFromSecretKeyFile,
   initializePrereqs,
   intializeMarketplace,
   mintBidTokens,
 } from "./scripts";
 import {
+  fetchListingV2,
   InitializeInstructionArgs,
   safeFetchMarketplace,
 } from "../clients/generated/umi/src";
@@ -19,11 +21,12 @@ import {
 import { createAndMintNftForCollection } from "./utils";
 
 const opts: TransactionBuilderSendAndConfirmOptions = {
-  send: { skipPreflight: true },
+  send: { skipPreflight: false },
   confirm: { commitment: "confirmed" },
 };
 
 const CLUSTER = "devnet";
+const ADMIN = "./wallets/admin.json";
 
 commander.version("0.1.0").description("CLI for testing Sandcastle program");
 
@@ -92,56 +95,33 @@ commander
       process.exit(1);
     }
   });
-//
-// commander
-//   .command("create-auction")
-//   .description("Create a new auction")
-//   .option("-k, --keypair <path>", "Seller address")
-//   .option("-n, --nft <address>", "NFT mint address")
-//   .option("--collection <address>", "Collection NFT mint address")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-d, --duration <number>", "Auction duration in seconds")
-//   .option("-p, --price <number>", "Auction buyout price (in LAMPORTS)")
-//   .action(async (options) => {
-//     try {
-//       const { keypair, cluster, nft, duration, price, collection } = options;
-//
-//       console.log("Creating auction...");
-//       console.log("NFT:", nft);
-//       console.log("Collection:", collection);
-//       console.log("Duration:", duration);
-//       console.log("Price:", price);
-//       console.log("-------------------");
-//
-//       await setClusterConfig(cluster, keypair);
-//       await initProject();
-//
-//       console.log("-------------------");
-//
-//       const walletKeypair = web3.Keypair.fromSecretKey(
-//         Uint8Array.from(JSON.parse(fs.readFileSync(keypair, "utf-8"))),
-//         { skipValidation: true }
-//       );
-//
-//       const durationInSlots = Math.floor(Number(duration) * 0.4); // 400ms per slot
-//
-//       try {
-//         await createAuctionListing(
-//           Number(price),
-//           Number(durationInSlots),
-//           walletKeypair, // Seller
-//           new PublicKey(nft),
-//           new PublicKey(collection)
-//         );
-//
-//         console.log("Auction created");
-//       } catch (error) {
-//         throw new Error(error);
-//       }
-//     } catch (err) {
-//       console.error("Error creating auction:", err);
-//     }
-//   });
+
+commander
+  .command("create-auction")
+  .description("Create a new auction")
+  .option("-k, --keypair <path>", "Seller address")
+  .option("-t, --token <address>", "NFT mint address")
+  .requiredOption("-m, --marketplace <address>", "Marketplace PDA address")
+  .option("-c, --collection <address>", "Collection NFT mint address")
+  .action(async (options) => {
+    try {
+      const { keypair, token, collection, marketplace } = options;
+      const { umi } = await initializePrereqs(CLUSTER, ADMIN);
+
+      const seller = await getSignerFromSecretKeyFile(umi, keypair);
+
+      await createAuctionListing(
+        umi,
+        seller,
+        token,
+        collection,
+        marketplace,
+        opts
+      );
+    } catch (err) {
+      console.error("Error creating auction:", err);
+    }
+  });
 //
 // commander
 //   .command("place-bid")
@@ -212,24 +192,21 @@ commander
 //     }
 //   });
 //
-// commander
-//   .command("get-auction-info")
-//   .description("Get information about an auction")
-//   .option("-a, --auction <address>", "Auction PDA address")
-//   .option("-c, --cluster <value>", "Solana Cluster")
-//   .option("-k, --keypair <path>", "Path to keypair file")
-//   .action(async (options) => {
-//     try {
-//       const { cluster, keypair, auction } = options;
-//
-//       await setClusterConfig(cluster, keypair);
-//       const auctionData = await getAuctionInfo(new PublicKey(auction));
-//       console.log("Auction:", auctionData);
-//     } catch (error) {
-//       console.error("Error fetching auction info:", error);
-//     }
-//   });
-//
+commander
+  .command("get-auction-info")
+  .description("Get information about an auction")
+  .option("-a, --auction <address>", "Auction Listing Account address")
+  .action(async (options) => {
+    try {
+      const { auction } = options;
+      const { umi } = await initializePrereqs(CLUSTER, ADMIN);
+
+      console.log(await fetchListingV2(umi, publicKey(auction)));
+    } catch (error) {
+      console.error("Error fetching auction info:", error);
+    }
+  });
+
 // commander
 //   .command("get-all-auctions")
 //   .description("Get information about all auction within marketplace")

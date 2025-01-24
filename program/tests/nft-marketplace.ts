@@ -337,9 +337,9 @@ describe("nft-marketplace", () => {
     const [metadata] = findMetadataPda(umi, {
       mint: fromWeb3JsPublicKey(mint),
     });
-    const editionAccount = findMasterEditionPda(umi, {
+    const [editionAccount] = findMasterEditionPda(umi, {
       mint: fromWeb3JsPublicKey(mint),
-    })[0];
+    });
 
     const [userAccount] = umi.eddsa.findPda(programId, [
       bytes().serialize(new Uint8Array([117, 115, 101, 114])),
@@ -969,7 +969,7 @@ describe("nft-marketplace", () => {
       umi,
       programId,
       fromWeb3JsPublicKey(marketplace),
-      initializer.publicKey
+      fromWeb3JsPublicKey(initializer.publicKey)
     );
 
     const AUTH_RULES_PROGRAM = umi.programs.getPublicKey(
